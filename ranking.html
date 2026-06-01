@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking - Polla Mundialista 2026</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo">
+      <span class="trophy">🏆</span>
+      <div>
+        <h1>Mundial 2026</h1>
+        <span>Predicciones de la Polla</span>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <a href="grupos.html">🗓️ Fase Grupos</a>
+      <a href="final.html">🏆 Fase Final</a>
+      <a href="admin.html" id="nav-admin" style="display:none;">⚙️ Admin</a>
+      <span id="nav-user" style="color:var(--accent); font-weight:bold;"></span>
+      <button id="nav-logout" style="display:none;">🚪 Salir</button>
+    </nav>
+  </header>
+
+  <div class="container">
+    <h2 style="color: var(--accent); text-align: center; margin-bottom: 10px;">📊 Tabla de Posiciones</h2>
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 30px;">Ranking de participantes por puntos acumulados</p>
+    
+    <div id="alert-box" class="alert"></div>
+    
+    <div style="overflow-x: auto;">
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th>Pos</th>
+            <th>Alias</th>
+            <th>Pts Fase Grupos</th>
+            <th>Pts Fase Final</th>
+            <th>Pts Total</th>
+          </tr>
+        </thead>
+        <tbody id="ranking-body">
+          <tr><td colspan="5" style="text-align:center; padding:30px;"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module" src="js/ranking.js"></script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin - Polla Mundialista 2026</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo">
+      <span class="trophy">🏆</span>
+      <div>
+        <h1>Mundial 2026</h1>
+        <span>Panel de Administración</span>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <a href="grupos.html">🗓️ Fase Grupos</a>
+      <a href="ranking.html">📊 Ranking</a>
+      <span id="nav-user" style="color:var(--accent); font-weight:bold;"></span>
+      <button id="nav-logout">🚪 Salir</button>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div id="alert-box" class="alert"></div>
+    
+    <h2 style="color: var(--accent); margin-bottom: 30px; text-align: center;">⚙️ Panel de Administrador</h2>
+    
+    <!-- Control de Fase Final -->
+    <div class="admin-section">
+      <h3>🎮 Control de Fases</h3>
+      <div class="toggle-container" style="margin-bottom: 20px;">
+        <span>Habilitar Fase Final para predicciones:</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-fase-final">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="status-fase-final" style="color: var(--text-muted); font-size: 0.9rem;">Deshabilitada</span>
+      </div>
+      <button id="btn-recalcular" class="btn btn-primary">🔄 Recalcular Puntajes</button>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">
+        Al recalcular, se comparan todas las predicciones con los resultados reales ingresados y se actualizan los puntos de cada participante.
+      </p>
+    </div>
+    
+    <!-- Resultados Fase de Grupos -->
+    <div class="admin-section">
+      <h3>⚽ Ingresar Resultados - Fase de Grupos</h3>
+      <div id="admin-grupos-container"></div>
+      <div style="text-align: center; margin-top: 20px;">
+        <button id="btn-save-grupos" class="btn btn-success">💾 Guardar Resultados de Grupos</button>
+      </div>
+    </div>
+    
+    <!-- Resultados Fase Final -->
+    <div class="admin-section">
+      <h3>🏆 Ingresar Resultados - Fase Final</h3>
+      <div id="admin-final-container"></div>
+      <div style="text-align: center; margin-top: 20px;">
+        <button id="btn-save-final" class="btn btn-success">💾 Guardar Resultados de Fase Final</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

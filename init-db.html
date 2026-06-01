@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inicializar Base de Datos - Polla Mundialista</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo">
+      <span class="trophy">🏆</span>
+      <div>
+        <h1>Mundial 2026</h1>
+        <span>Inicialización de Datos</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container" style="max-width: 600px; margin-top: 40px;">
+    <div class="login-container">
+      <h2>⚙️ Inicializar Base de Datos</h2>
+      <p style="color: var(--text-muted); margin-bottom: 20px;">
+        Este proceso cargará todos los partidos de la fase de grupos y la fase final en Firebase. 
+        Ejecútalo solo una vez al inicio del torneo.
+      </p>
+      
+      <div id="alert-box" class="alert"></div>
+      
+      <button id="btn-init" class="btn btn-success btn-block" style="margin-bottom: 15px;">
+        🚀 Cargar Partidos en Firebase
+      </button>
+      
+      <div id="init-status" style="color: var(--text-muted); font-size: 0.9rem;"></div>
+      
+      <hr style="border-color: var(--border); margin: 30px 0;">
+      
+      <a href="index.html" class="btn btn-primary btn-block">← Volver al Login</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db } from './js/firebase-config.js';
+    import { collection, getDocs, writeBatch, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { generarPartidosGrupos, generarPartidosFinal } from './js/data.js';
+    
+    const alertBox = document.getElementById('alert-box');
+    const status = document.getElementById('init-status');
+    
+    function showAlert(msg, type) {
+      alertBox.textContent = msg;
+      alertBox.className = `alert alert-${type} show`;
+    }
+    
+    document.getElementById('btn-init').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-init');
+      btn.disabled = true;
+      status.textContent = 'Inicializando...';
+      
+      try {
+        // Verificar si ya existen partidos
+        const existing = await getDocs(collection(db, 'partidos_grupos'));
+        if (!existing.empty) {
+          showAlert('⚠️ Ya existen partidos en la base de datos. Si quieres reiniciar, elimínalos primero desde Firebase Console.', 'danger');
+          btn.disabled = false;
+          status.textContent = '';
+          return;
+        }
+        
+        const batch = writeBatch(db);
+        
+        // 1. Crear partidos de grupos
+        const partidosGrupos = generarPartidosGrupos();
+        for (const p of partidosGrupos) {
+          const ref = doc(db, 'partidos_grupos', p.id);
+          batch.set(ref, {
+            grupo: p.grupo,
+            equipo1: p.equipo1,
+            equipo2: p.equipo2,
+            goles_equipo1: null,
+            goles_equipo2: null,
+            jugado: false,
+            fecha: p.fecha
+          });
+        }
+        
+        // 2. Crear partidos de fase final
+        const partidosFinal = generarPartidosFinal();
+        for (const p of partidosFinal) {
+          const ref = doc(db, 'partidos_final', p.id);
+          batch.set(ref, {
+            ronda: p.ronda,
+            numero: p.numero,
+            equipo1: p.equipo1,
+            equipo2: p.equipo2,
+            goles_equipo1: null,
+            goles_equipo2: null,
+            penales_equipo1: null,
+            penales_equipo2: null,
+            jugado: false,
+            ganador: null
+          });
+        }
+        
+        // 3. Crear documento de config
+        const configRef = doc(db, 'config', 'app_config');
+        batch.set(configRef, {
+          fase_actual: 'grupos',
+          fase_final_habilitada: false,
+          creado: new Date().toISOString()
+        });
+        
+        await batch.commit();
+        
+        showAlert(`✅ Base de datos inicializada:\n• ${partidosGrupos.length} partidos de grupos\n• ${partidosFinal.length} partidos de fase final`, 'success');
+        status.textContent = 'Inicialización completada con éxito.';
+        
+      } catch (err) {
+        console.error(err);
+        showAlert('Error inicializando base de datos: ' + err.message, 'danger');
+        status.textContent = '';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

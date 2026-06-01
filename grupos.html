@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fase de Grupos - Polla Mundialista 2026</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo">
+      <span class="trophy">🏆</span>
+      <div>
+        <h1>Mundial 2026</h1>
+        <span>Predicciones de la Polla</span>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <a href="ranking.html">📊 Ranking</a>
+      <a href="admin.html" id="nav-admin" style="display:none;">⚙️ Admin</a>
+      <span id="nav-user" style="color:var(--accent); font-weight:bold;"></span>
+      <button id="nav-logout" style="display:none;">🚪 Salir</button>
+    </nav>
+  </header>
+
+  <div class="nav-tabs">
+    <a href="grupos.html" class="nav-tab active">🗓️ Fase Grupos</a>
+    <a href="final.html" class="nav-tab" id="tab-final">🏆 Fase Final</a>
+  </div>
+
+  <div class="container">
+    <div id="alert-box" class="alert"></div>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+      <h2 style="color: var(--accent); font-size: 1.3rem;">Ingresa tus predicciones para cada partido de la fase de grupos</h2>
+      <p style="color: var(--text-muted); margin-top: 10px;">3 puntos por marcador exacto • 1 punto por acertar ganador o empate</p>
+    </div>
+    
+    <div id="groups-container"></div>
+    
+    <div style="text-align: center; margin: 40px 0;">
+      <button id="btn-save" class="btn btn-primary" style="padding: 15px 50px; font-size: 1.1rem;">
+        💾 Guardar Predicciones
+      </button>
+      <div id="save-status" style="margin-top: 15px; color: var(--text-muted);"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/grupos.js"></script>
+</body>
+</html>
