@@ -25,6 +25,7 @@ function getFlagUrl(pais) {
 
 let partidosFinal = [];
 let prediccionesLocales = {};
+let prediccionesGuardadasIds = new Set();
 
 // Verificar si fase final está habilitada
 async function checkFaseFinal() {
@@ -60,7 +61,10 @@ async function cargarPartidosFinal() {
     snapshot.forEach(d => partidosFinal.push({ id: d.id, ...d.data() }));
     partidosFinal.sort((a, b) => a.numero - b.numero);
     
+    await cargarPrediccionesUsuario();
+    
     container.innerHTML = '';
+    let tienePartidosEditables = false;
     
     for (const p of partidosFinal) {
       const card = document.createElement('div');
@@ -70,13 +74,17 @@ async function cargarPartidosFinal() {
       card.dataset.id = p.id;
       
       const jugado = p.jugado;
-      const disabled = jugado ? 'disabled' : '';
-      const localPred = prediccionesLocales[p.id] || {};
+      const yaGuardado = prediccionesGuardadasIds.has(p.id);
+      const bloqueado = jugado || yaGuardado;
+      const disabled = bloqueado ? 'disabled' : '';
+      
+      if (!bloqueado) tienePartidosEditables = true;
       
       // Determinar qué equipos mostrar (si ya hay reales o placeholders)
       const eq1 = p.equipo1 || 'Por definir';
       const eq2 = p.equipo2 || 'Por definir';
-      const tieneEquipoReal = !eq1.startsWith('1') && !eq1.startsWith('2') && !eq1.startsWith('3');
+      
+      const localPred = prediccionesLocales[p.id] || {};
       
       card.innerHTML = `
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
@@ -115,7 +123,14 @@ async function cargarPartidosFinal() {
         </div>
       `;
       
-      if (jugado) {
+      // Badge de estado
+      if (yaGuardado && !jugado) {
+        const guardadoBadge = document.createElement('div');
+        guardadoBadge.style.cssText = 'position:absolute; top:8px; right:8px; font-size:0.7rem; color:#4caf50; background:rgba(0,0,0,0.6); padding:3px 8px; border-radius:6px; font-weight:bold;';
+        guardadoBadge.textContent = '✓ Guardado';
+        card.style.position = 'relative';
+        card.appendChild(guardadoBadge);
+      } else if (jugado) {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:absolute; top:8px; right:8px; font-size:0.7rem; color:var(--accent); background:rgba(0,0,0,0.6); padding:3px 8px; border-radius:6px;';
         overlay.textContent = `Resultado: ${p.goles_equipo1 ?? '-'} - ${p.goles_equipo2 ?? '-'}${p.penales_equipo1 !== null ? ` (Pen: ${p.penales_equipo1}-${p.penales_equipo2})` : ''}`;
@@ -126,8 +141,8 @@ async function cargarPartidosFinal() {
       container.appendChild(card);
     }
     
-    // Listeners
-    container.querySelectorAll('input, select').forEach(el => {
+    // Listeners (solo inputs no bloqueados)
+    container.querySelectorAll('input:not([disabled]), select:not([disabled])').forEach(el => {
       el.addEventListener('change', (e) => {
         const id = e.target.dataset.id;
         const field = e.target.dataset.field;
@@ -136,7 +151,19 @@ async function cargarPartidosFinal() {
       });
     });
     
-    await cargarPrediccionesUsuario();
+    // Deshabilitar botón si no hay partidos editables
+    const btnSave = document.getElementById('btn-save-final');
+    if (!tienePartidosEditables) {
+      btnSave.disabled = true;
+      btnSave.textContent = '✓ Todas las predicciones guardadas';
+      btnSave.style.opacity = '0.6';
+      document.getElementById('save-status').textContent = 'Ya guardaste todas tus predicciones. Espera los resultados oficiales.';
+    } else {
+      btnSave.disabled = false;
+      btnSave.textContent = '💾 Guardar Predicciones Fase Final';
+      btnSave.style.opacity = '1';
+      document.getElementById('save-status').textContent = '';
+    }
     
   } catch (err) {
     console.error(err);
@@ -144,7 +171,7 @@ async function cargarPartidosFinal() {
   }
 }
 
-// Cargar predicciones del usuario
+// Cargar predicciones del usuario desde Firestore
 async function cargarPrediccionesUsuario() {
   try {
     const user = getCurrentUser();
@@ -154,6 +181,7 @@ async function cargarPrediccionesUsuario() {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (data.user_id === user.cedula) {
+        prediccionesGuardadasIds.add(data.partido_id);
         prediccionesLocales[data.partido_id] = {
           g1: data.prediccion_equipo1 ?? '',
           g2: data.prediccion_equipo2 ?? '',
@@ -161,15 +189,6 @@ async function cargarPrediccionesUsuario() {
           p2: data.prediccion_penales_equipo2 ?? '',
           ganador: data.prediccion_ganador ?? ''
         };
-      }
-    });
-    
-    // Refrescar UI
-    document.querySelectorAll('#final-matches input, #final-matches select').forEach(el => {
-      const id = el.dataset.id;
-      const field = el.dataset.field;
-      if (prediccionesLocales[id] && prediccionesLocales[id][field] !== undefined) {
-        el.value = prediccionesLocales[id][field];
       }
     });
     
@@ -189,8 +208,12 @@ document.getElementById('btn-save-final').addEventListener('click', async () => 
   
   try {
     const batch = writeBatch(db);
+    let countGuardados = 0;
     
     for (const [partidoId, preds] of Object.entries(prediccionesLocales)) {
+      // Saltar si ya estaba guardado
+      if (prediccionesGuardadasIds.has(partidoId)) continue;
+      
       const g1 = preds.g1 !== '' ? parseInt(preds.g1) : null;
       const g2 = preds.g2 !== '' ? parseInt(preds.g2) : null;
       const p1 = preds.p1 !== '' ? parseInt(preds.p1) : null;
@@ -212,11 +235,24 @@ document.getElementById('btn-save-final').addEventListener('click', async () => 
         prediccion_ganador: ganador,
         actualizado: new Date().toISOString()
       });
+      
+      prediccionesGuardadasIds.add(partidoId);
+      countGuardados++;
+    }
+    
+    if (countGuardados === 0) {
+      showAlert('No hay nuevas predicciones para guardar', 'info');
+      status.textContent = '';
+      btn.disabled = false;
+      return;
     }
     
     await batch.commit();
-    showAlert('¡Predicciones de fase final guardadas!', 'success');
+    showAlert(`¡${countGuardados} predicciones de fase final guardadas!`, 'success');
     status.textContent = 'Guardado el ' + new Date().toLocaleString();
+    
+    // Re-renderizar para bloquear inputs
+    cargarPartidosFinal();
     
   } catch (err) {
     console.error(err);

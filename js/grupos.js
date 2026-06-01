@@ -26,9 +26,10 @@ function getFlagUrl(pais) {
   return `https://flagcdn.com/w40/${code}.png`;
 }
 
-// Estado local de predicciones
+// Estado local
 let partidosData = [];
 let prediccionesLocales = {};
+let prediccionesGuardadasIds = new Set(); // IDs de partidos ya guardados en Firestore
 
 // Cargar partidos desde Firestore
 async function cargarPartidos() {
@@ -52,8 +53,8 @@ async function cargarPartidos() {
       return (a.fecha || 0) - (b.fecha || 0);
     });
     
-    renderizarGrupos();
     await cargarPrediccionesUsuario();
+    renderizarGrupos();
     
   } catch (err) {
     console.error(err);
@@ -67,6 +68,7 @@ function renderizarGrupos() {
   container.innerHTML = '';
   
   const gruposOrden = 'ABCDEFGHIJKL'.split('');
+  let tienePartidosEditables = false;
   
   for (const grupo of gruposOrden) {
     const partidosGrupo = partidosData.filter(p => p.grupo === grupo);
@@ -89,7 +91,11 @@ function renderizarGrupos() {
       card.dataset.id = partido.id;
       
       const jugado = partido.jugado;
-      const disabled = jugado ? 'disabled' : '';
+      const yaGuardado = prediccionesGuardadasIds.has(partido.id);
+      const bloqueado = jugado || yaGuardado;
+      const disabled = bloqueado ? 'disabled' : '';
+      
+      if (!bloqueado) tienePartidosEditables = true;
       
       card.innerHTML = `
         <div class="match-team">
@@ -107,7 +113,14 @@ function renderizarGrupos() {
         </div>
       `;
       
-      if (jugado) {
+      // Badge de estado
+      if (yaGuardado && !jugado) {
+        const guardadoBadge = document.createElement('div');
+        guardadoBadge.style.cssText = 'position:absolute; right:10px; top:5px; font-size:0.7rem; color:#4caf50; background:rgba(0,0,0,0.6); padding:2px 8px; border-radius:8px; font-weight:bold;';
+        guardadoBadge.textContent = '✓ Guardado';
+        card.style.position = 'relative';
+        card.appendChild(guardadoBadge);
+      } else if (jugado) {
         const resultOverlay = document.createElement('div');
         resultOverlay.style.cssText = 'position:absolute; right:10px; top:5px; font-size:0.75rem; color:var(--accent); background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:8px;';
         resultOverlay.textContent = `Resultado: ${partido.goles_equipo1 ?? '-'} - ${partido.goles_equipo2 ?? '-'}`;
@@ -122,8 +135,8 @@ function renderizarGrupos() {
     container.appendChild(section);
   }
   
-  // Agregar listeners a inputs
-  document.querySelectorAll('.match-score input').forEach(input => {
+  // Agregar listeners a inputs (solo si no están bloqueados)
+  document.querySelectorAll('.match-score input:not([disabled])').forEach(input => {
     input.addEventListener('change', (e) => {
       const id = e.target.dataset.id;
       const field = e.target.dataset.field;
@@ -131,9 +144,23 @@ function renderizarGrupos() {
       prediccionesLocales[id][field] = e.target.value;
     });
   });
+  
+  // Deshabilitar botón si no hay partidos editables
+  const btnSave = document.getElementById('btn-save');
+  if (!tienePartidosEditables) {
+    btnSave.disabled = true;
+    btnSave.textContent = '✓ Todas las predicciones guardadas';
+    btnSave.style.opacity = '0.6';
+    document.getElementById('save-status').textContent = 'Ya guardaste todas tus predicciones. Espera los resultados oficiales.';
+  } else {
+    btnSave.disabled = false;
+    btnSave.textContent = '💾 Guardar Predicciones';
+    btnSave.style.opacity = '1';
+    document.getElementById('save-status').textContent = '';
+  }
 }
 
-// Cargar predicciones del usuario
+// Cargar predicciones del usuario desde Firestore
 async function cargarPrediccionesUsuario() {
   try {
     const user = getCurrentUser();
@@ -143,19 +170,11 @@ async function cargarPrediccionesUsuario() {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (data.user_id === user.cedula) {
+        prediccionesGuardadasIds.add(data.partido_id);
         prediccionesLocales[data.partido_id] = {
           e1: data.prediccion_equipo1 ?? '',
           e2: data.prediccion_equipo2 ?? ''
         };
-      }
-    });
-    
-    // Refrescar inputs
-    document.querySelectorAll('.match-score input').forEach(input => {
-      const id = input.dataset.id;
-      const field = input.dataset.field;
-      if (prediccionesLocales[id] && prediccionesLocales[id][field] !== undefined) {
-        input.value = prediccionesLocales[id][field];
       }
     });
     
@@ -175,8 +194,12 @@ async function guardarPredicciones() {
   
   try {
     const batch = writeBatch(db);
+    let countGuardados = 0;
     
     for (const [partidoId, preds] of Object.entries(prediccionesLocales)) {
+      // Saltar si ya estaba guardado
+      if (prediccionesGuardadasIds.has(partidoId)) continue;
+      
       const e1 = preds.e1 !== '' ? parseInt(preds.e1) : null;
       const e2 = preds.e2 !== '' ? parseInt(preds.e2) : null;
       
@@ -192,11 +215,24 @@ async function guardarPredicciones() {
         prediccion_equipo2: e2,
         actualizado: new Date().toISOString()
       });
+      
+      prediccionesGuardadasIds.add(partidoId);
+      countGuardados++;
+    }
+    
+    if (countGuardados === 0) {
+      showAlert('No hay nuevas predicciones para guardar', 'info');
+      status.textContent = '';
+      btn.disabled = false;
+      return;
     }
     
     await batch.commit();
-    showAlert('¡Predicciones guardadas correctamente!', 'success');
+    showAlert(`¡${countGuardados} predicciones guardadas correctamente!`, 'success');
     status.textContent = 'Guardado el ' + new Date().toLocaleString();
+    
+    // Re-renderizar para bloquear inputs
+    renderizarGrupos();
     
   } catch (err) {
     console.error(err);
