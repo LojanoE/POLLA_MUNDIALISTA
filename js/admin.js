@@ -415,13 +415,133 @@ async function recalcularTodosLosPuntos() {
         const predGanador = pred.prediccion_ganador;
         if (realGanador && predGanador && realGanador === predGanador) ptsPartido += 1;
         
+        // Cap máximo de 4 puntos por partido
+        if (ptsPartido > 4) ptsPartido = 4;
+        
         ptsFinal += ptsPartido;
       }
       
       puntosPorUsuario[u.id].puntosFinal = ptsFinal;
     }
     
-    // 6. Guardar puntos en Firestore
+    // 6. Calcular bonos de progresión de ronda para cada usuario
+    for (const u of usuarios) {
+      const preds = predsFinal[u.id] || {};
+      let ptsBonos = 0;
+      
+      // Simular bracket del usuario basado en sus predicciones
+      const predEquiposPorRonda = {
+        octavos: new Set(),
+        cuartos: new Set(),
+        semis: new Set(),
+        finalistas: new Set(),
+        subcampeon: null,
+        campeon: null
+      };
+      
+      // Procesar todas las predicciones del usuario
+      for (const [partidoId, pred] of Object.entries(preds)) {
+        const partido = allPartidosFinal[partidoId];
+        if (!partido) continue;
+        
+        // Determinar ganador según predicción del usuario
+        let predGanador = null;
+        const pg1 = pred.prediccion_equipo1;
+        const pg2 = pred.prediccion_equipo2;
+        const pp1 = pred.prediccion_penales_equipo1;
+        const pp2 = pred.prediccion_penales_equipo2;
+        
+        if (pg1 > pg2) predGanador = partido.equipo1;
+        else if (pg2 > pg1) predGanador = partido.equipo2;
+        else if (pp1 !== null && pp2 !== null && pp1 !== pp2) {
+          predGanador = pp1 > pp2 ? partido.equipo1 : partido.equipo2;
+        } else if (pred.prediccion_ganador) {
+          predGanador = pred.prediccion_ganador;
+        }
+        
+        if (!predGanador) continue;
+        
+        // Clasificar según ronda
+        if (partido.ronda === 'dieciseisavos') {
+          predEquiposPorRonda.octavos.add(predGanador);
+        } else if (partido.ronda === 'octavos') {
+          predEquiposPorRonda.cuartos.add(predGanador);
+        } else if (partido.ronda === 'cuartos') {
+          predEquiposPorRonda.semis.add(predGanador);
+        } else if (partido.ronda === 'semis') {
+          predEquiposPorRonda.finalistas.add(predGanador);
+        } else if (partido.ronda === 'final') {
+          // El ganador de la final es campeón
+          predEquiposPorRonda.campeon = predGanador;
+          // El perdedor es subcampeón (calcularlo)
+          const predPerdedor = predGanador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
+          predEquiposPorRonda.subcampeon = predPerdedor;
+        }
+      }
+      
+      // Comparar con resultados reales y otorgar bonos
+      const realEquiposPorRonda = {
+        octavos: new Set(),
+        cuartos: new Set(),
+        semis: new Set(),
+        finalistas: new Set(),
+        subcampeon: null,
+        campeon: null
+      };
+      
+      for (const [id, p] of Object.entries(allPartidosFinal)) {
+        if (!p.jugado) continue;
+        const ganador = getGanadorReal(p);
+        if (!ganador) continue;
+        
+        if (p.ronda === 'dieciseisavos') {
+          realEquiposPorRonda.octavos.add(ganador);
+        } else if (p.ronda === 'octavos') {
+          realEquiposPorRonda.cuartos.add(ganador);
+        } else if (p.ronda === 'cuartos') {
+          realEquiposPorRonda.semis.add(ganador);
+        } else if (p.ronda === 'semis') {
+          realEquiposPorRonda.finalistas.add(ganador);
+        } else if (p.ronda === 'final') {
+          realEquiposPorRonda.campeon = ganador;
+          realEquiposPorRonda.subcampeon = getPerdedorReal(p);
+        }
+      }
+      
+      // 1 pt por equipo en octavos
+      for (const equipo of predEquiposPorRonda.octavos) {
+        if (realEquiposPorRonda.octavos.has(equipo)) ptsBonos += 1;
+      }
+      
+      // 1 pt por equipo en cuartos
+      for (const equipo of predEquiposPorRonda.cuartos) {
+        if (realEquiposPorRonda.cuartos.has(equipo)) ptsBonos += 1;
+      }
+      
+      // 1 pt por equipo en semis
+      for (const equipo of predEquiposPorRonda.semis) {
+        if (realEquiposPorRonda.semis.has(equipo)) ptsBonos += 1;
+      }
+      
+      // 1 pt por finalista
+      for (const equipo of predEquiposPorRonda.finalistas) {
+        if (realEquiposPorRonda.finalistas.has(equipo)) ptsBonos += 1;
+      }
+      
+      // 2 pts por subcampeón
+      if (predEquiposPorRonda.subcampeon && predEquiposPorRonda.subcampeon === realEquiposPorRonda.subcampeon) {
+        ptsBonos += 2;
+      }
+      
+      // 4 pts por campeón
+      if (predEquiposPorRonda.campeon && predEquiposPorRonda.campeon === realEquiposPorRonda.campeon) {
+        ptsBonos += 4;
+      }
+      
+      puntosPorUsuario[u.id].puntosFinal += ptsBonos;
+    }
+    
+    // 7. Guardar puntos en Firestore
     const batch = writeBatch(db);
     for (const [userId, pts] of Object.entries(puntosPorUsuario)) {
       const ref = doc(db, 'users', userId);
@@ -530,8 +650,8 @@ function calcularEquipoDinamico(partidoId, esEquipo1) {
     return esEquipo1 ? `Ganador ${sourceId}` : `Ganador ${sourceId}`;
   }
   
-  const g1 = resultSource.g1;
-  const g2 = resultSource.g2;
+  const g1 = parseInt(resultSource.g1);
+  const g2 = parseInt(resultSource.g2);
   const p1 = resultSource.p1 !== '' ? parseInt(resultSource.p1) : null;
   const p2 = resultSource.p2 !== '' ? parseInt(resultSource.p2) : null;
   
@@ -993,6 +1113,160 @@ function mostrarResumenFinal() {
   });
 }
 
+// ===== GENERAR FASE FINAL AUTOMÁTICAMENTE =====
+document.getElementById('btn-generar-fase-final').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-generar-fase-final');
+  const status = document.getElementById('generar-status');
+  const previewTabla = document.getElementById('tabla-grupos-preview');
+  const previewTerceros = document.getElementById('mejores-terceros-preview');
+  
+  btn.disabled = true;
+  status.textContent = 'Calculando clasificación...';
+  
+  try {
+    // 1. Obtener todos los partidos de grupos
+    const partidosSnap = await getDocs(collection(db, 'partidos_grupos'));
+    const partidosPorGrupo = {};
+    partidosSnap.forEach(d => {
+      const data = d.data();
+      if (!partidosPorGrupo[data.grupo]) partidosPorGrupo[data.grupo] = [];
+      partidosPorGrupo[data.grupo].push({ id: d.id, ...data });
+    });
+    
+    // 2. Calcular tabla de cada grupo
+    const posicionesGrupos = {};
+    const terceros = [];
+    let previewHtml = '<h4 style="color: var(--accent); margin-bottom: 15px;">📊 Tabla de Grupos</h4>';
+    previewHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">';
+    
+    for (const [grupo, partidos] of Object.entries(partidosPorGrupo)) {
+      // Verificar que todos los partidos del grupo estén jugados
+      const todosJugados = partidos.every(p => p.jugado && p.goles_equipo1 !== null && p.goles_equipo2 !== null);
+      if (!todosJugados) {
+        throw new Error(`El grupo ${grupo} no tiene todos los partidos jugados. Ingresa todos los resultados primero.`);
+      }
+      
+      const equipos = GRUPOS[grupo];
+      const tabla = calcularTablaGrupo(partidos, equipos);
+      posicionesGrupos[grupo] = tabla.map(t => t.equipo);
+      
+      // Guardar tercero
+      if (tabla[2]) {
+        terceros.push({
+          equipo: tabla[2].equipo,
+          grupo: grupo,
+          pts: tabla[2].pts,
+          dif: tabla[2].gf - tabla[2].gc,
+          gf: tabla[2].gf
+        });
+      }
+      
+      // Previsualización
+      previewHtml += `
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+          <h5 style="color: var(--accent); margin-bottom: 10px;">Grupo ${grupo}</h5>
+          <table style="width:100%; font-size: 0.85rem;">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <th style="text-align:left; padding: 4px;">Pos</th>
+              <th style="text-align:left; padding: 4px;">Equipo</th>
+              <th style="text-align:center; padding: 4px;">Pts</th>
+              <th style="text-align:center; padding: 4px;">Dif</th>
+            </tr>
+      `;
+      tabla.forEach((t, idx) => {
+        const posColor = idx === 0 ? 'color: gold;' : idx === 1 ? 'color: silver;' : idx === 2 ? 'color: #cd7f32;' : '';
+        previewHtml += `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <td style="padding: 4px; ${posColor} font-weight: bold;">${idx + 1}</td>
+            <td style="padding: 4px;">${t.equipo}</td>
+            <td style="text-align:center; padding: 4px;">${t.pts}</td>
+            <td style="text-align:center; padding: 4px;">${t.gf - t.gc}</td>
+          </tr>
+        `;
+      });
+      previewHtml += '</table></div>';
+    }
+    previewHtml += '</div>';
+    previewTabla.innerHTML = previewHtml;
+    previewTabla.style.display = 'block';
+    
+    // 3. Seleccionar 8 mejores terceros
+    const mejores8 = seleccionarMejoresTerceros(terceros);
+    
+    let tercerosHtml = '<h4 style="color: var(--accent); margin: 20px 0 15px;">🥉 8 Mejores Terceros (Clasificados)</h4>';
+    tercerosHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+    mejores8.forEach((t, idx) => {
+      tercerosHtml += `
+        <div style="background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; padding: 10px; border-radius: 8px;">
+          <strong style="color: #4caf50;">#${idx + 1}</strong> ${t.equipo} <span style="color: var(--text-muted); font-size: 0.8rem;">(Grupo ${t.grupo}, ${t.pts}pts, Dif ${t.dif})</span>
+        </div>
+      `;
+    });
+    // Mostrar los que NO clasificaron
+    const noClasificados = terceros.filter(t => !mejores8.includes(t));
+    if (noClasificados.length > 0) {
+      tercerosHtml += '</div><h5 style="color: var(--text-muted); margin: 15px 0 10px;">❌ Terceros No Clasificados</h5>';
+      tercerosHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+      noClasificados.forEach(t => {
+        tercerosHtml += `
+          <div style="background: rgba(244, 67, 54, 0.2); border: 1px solid var(--danger); padding: 10px; border-radius: 8px;">
+            <strong style="color: var(--danger);">✗</strong> ${t.equipo} <span style="color: var(--text-muted); font-size: 0.8rem;">(Grupo ${t.grupo}, ${t.pts}pts, Dif ${t.dif})</span>
+          </div>
+        `;
+      });
+    }
+    tercerosHtml += '</div>';
+    previewTerceros.innerHTML = tercerosHtml;
+    previewTerceros.style.display = 'block';
+    
+    // 4. Actualizar partidos de 16avos en Firestore
+    const batch = writeBatch(db);
+    const partidosFinalSnap = await getDocs(collection(db, 'partidos_final'));
+    const partidosFinal = [];
+    partidosFinalSnap.forEach(d => partidosFinal.push({ id: d.id, ...d.data() }));
+    
+    // Solo actualizar los 16 primeros (dieciseisavos)
+    const dieciseisavos = partidosFinal.filter(p => p.ronda === 'dieciseisavos').sort((a, b) => a.numero - b.numero);
+    
+    if (dieciseisavos.length !== 16) {
+      throw new Error(`Se esperaban 16 partidos de dieciseisavos, pero hay ${dieciseisavos.length}. Reinicia la base de datos.`);
+    }
+    
+    for (const p of dieciseisavos) {
+      const eq1 = placeholderToEquipo(p.equipo1, posicionesGrupos);
+      const eq2 = placeholderToEquipo(p.equipo2, posicionesGrupos);
+      
+      const ref = doc(db, 'partidos_final', p.id);
+      batch.update(ref, {
+        equipo1: eq1,
+        equipo2: eq2
+      });
+    }
+    
+    await batch.commit();
+    
+    showModal({
+      icon: '✅',
+      title: '¡Fase Final Generada!',
+      message: 'Se calcularon las tablas de posiciones y se actualizaron los 16 partidos de dieciseisavos con los equipos reales clasificados.',
+      btnPrimaryText: 'Continuar',
+      btnPrimaryClass: 'btn btn-success'
+    });
+    
+    status.innerHTML = '<span style="color: #4caf50;">✅ 16 partidos de dieciseisavos actualizados con equipos reales. Ahora puedes habilitar la fase final.</span>';
+    
+    // Recargar la vista
+    await cargarPartidosFinal();
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'Error generando fase final: ' + err.message, 'error');
+    status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // ===== INICIALIZACIÓN =====
 async function init() {
   await checkFaseFinalHabilitada();
@@ -1050,7 +1324,7 @@ document.getElementById('btn-init-db').addEventListener('click', async () => {
         goles_equipo2: null,
         penales_equipo1: null,
         penales_equipo2: null,
-        jugada: false,
+        jugado: false,
         ganador: null
       };
       if (p.source_equipo1 !== undefined) data.source_equipo1 = p.source_equipo1;
