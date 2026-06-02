@@ -139,6 +139,14 @@ function actualizarEncabezados() {
   }
 }
 
+// Determinar si un usuario pertenece a una institución (con fallback)
+function usuarioPerteneceAInstitucion(u, institucion) {
+  if (!institucion || institucion === 'TODAS') return true;
+  if (u.institucion_activa === institucion) return true;
+  if (u.instituciones && u.instituciones.includes(institucion)) return true;
+  return false;
+}
+
 // Cargar ranking con listener en tiempo real
 async function cargarRanking() {
   try {
@@ -147,28 +155,26 @@ async function cargarRanking() {
       unsubscribeRanking();
     }
     
-    let q;
-    if (isAdmin && institucionFiltro === 'TODAS') {
-      q = query(collection(db, 'users'));
-    } else if (isAdmin) {
-      q = query(collection(db, 'users'), where('institucion_activa', '==', institucionFiltro));
-    } else {
-      // Usuario normal: solo ve su institución
-      const userInst = getInstitucionActiva();
-      if (userInst) {
-        q = query(collection(db, 'users'), where('institucion_activa', '==', userInst));
-      } else {
-        q = query(collection(db, 'users'));
-      }
-    }
+    // Siempre cargar TODOS los usuarios y filtrar en JS (más robusto para datos antiguos)
+    const q = query(collection(db, 'users'));
     
     // Usar onSnapshot para actualizaciones en tiempo real
     unsubscribeRanking = onSnapshot(q, (snapshot) => {
-      const usuarios = [];
+      const todosLosUsuarios = [];
       snapshot.forEach(d => {
-        usuarios.push({ id: d.id, ...d.data() });
+        todosLosUsuarios.push({ id: d.id, ...d.data() });
       });
-      renderizarRanking(usuarios);
+      
+      // Filtrar por institución en memoria (maneja usuarios sin institucion_activa)
+      const usuariosFiltrados = todosLosUsuarios.filter(u => {
+        if (isAdmin && institucionFiltro === 'TODAS') return true;
+        if (isAdmin) return usuarioPerteneceAInstitucion(u, institucionFiltro);
+        // Usuario normal: solo ver su institución
+        const userInst = getInstitucionActiva();
+        return usuarioPerteneceAInstitucion(u, userInst);
+      });
+      
+      renderizarRanking(usuariosFiltrados);
     }, (err) => {
       console.error(err);
       showAlert('Error cargando ranking', 'danger');

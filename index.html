@@ -93,7 +93,7 @@
         let html = '<option value="">Selecciona tu institución...</option>';
         snapshot.forEach(d => {
           const data = d.data();
-          html += `<option value="${data.codigo}">${data.nombre}</option>`;
+          html += `<option value="${d.id}">${data.nombre || d.id}</option>`;
         });
         select.innerHTML = html;
       } catch (err) {
@@ -124,15 +124,14 @@
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          // Usuario existente - verificar si ya está en esta institución
+          // Usuario existente - siempre actualizar institucion_activa
           const userData = userSnap.data();
           const instituciones = userData.instituciones || [];
-          if (!instituciones.includes(institucion)) {
-            // Agregar institución al usuario
-            await setDoc(userRef, {
-              instituciones: [...instituciones, institucion]
-            }, { merge: true });
-          }
+          const nuevasInstituciones = instituciones.includes(institucion) ? instituciones : [...instituciones, institucion];
+          await setDoc(userRef, {
+            instituciones: nuevasInstituciones,
+            institucion_activa: institucion
+          }, { merge: true });
           setCurrentUser(cedula, alias, false, institucion);
           window.location.href = 'grupos.html';
         } else {
@@ -150,6 +149,7 @@
             cedula,
             alias,
             instituciones: [institucion],
+            institucion_activa: institucion,
             puntos_fase_grupos: 0,
             puntos_fase_final: 0,
             puntos_total: 0,

@@ -382,13 +382,26 @@ async function recalcularTodosLosPuntos() {
     });
     
     // 3. Obtener predicciones de grupos (filtradas por institución activa del usuario)
+    // Normalizar: asegurar que cada usuario tenga institucion_activa
+    const batchUsers = writeBatch(db);
+    let usersUpdated = 0;
+    for (const u of usuarios) {
+      if (!u.institucion_activa && u.instituciones && u.instituciones.length > 0) {
+        u.institucion_activa = u.instituciones[0];
+        batchUsers.update(doc(db, 'users', u.id), { institucion_activa: u.instituciones[0] });
+        usersUpdated++;
+      }
+    }
+    if (usersUpdated > 0) await batchUsers.commit();
+    
     const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
     const predsGrupos = {};
     predsGruposSnap.forEach(d => {
       const data = d.data();
       // Solo incluir si la institución de la predicción coincide con la institución activa del usuario
       const user = usuarios.find(u => u.id === data.user_id);
-      if (user && data.institucion === user.institucion_activa) {
+      const userInstitucion = user ? (user.institucion_activa || (user.instituciones && user.instituciones[0])) : null;
+      if (user && data.institucion === userInstitucion) {
         if (!predsGrupos[data.user_id]) predsGrupos[data.user_id] = {};
         predsGrupos[data.user_id][data.partido_id] = data;
       }
@@ -431,24 +444,67 @@ async function recalcularTodosLosPuntos() {
     const predsFinal = {};
     predsFinalSnap.forEach(d => {
       const data = d.data();
-      // Solo incluir si la institución de la predicción coincide con la institución activa del usuario
+      // Solo inclir si la institución de la predicción coincide con la institución activa del usuario
       const user = usuarios.find(u => u.id === data.user_id);
-      if (user && data.institucion === user.institucion_activa) {
+      const userInstitucion = user ? (user.institucion_activa || (user.instituciones && user.instituciones[0])) : null;
+      if (user && data.institucion === userInstitucion) {
         if (!predsFinal[data.user_id]) predsFinal[data.user_id] = {};
         predsFinal[data.user_id][data.partido_id] = data;
       }
     });
     
+    // Resolver nombre real de equipo (reemplaza placeholders con equipos reales del bracket)
+    const resolverEquipoReal = (partido, esEquipo1) => {
+      let nombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
+      // Si no es placeholder, devolver directo
+      if (!nombre || (!nombre.startsWith('Ganador') && !nombre.startsWith('Perdedor') && !/^[123][A-L]$/.test(nombre))) {
+        return nombre;
+      }
+      // Para dieciseisavos, los equipos ya deben ser reales tras Generar Fase Final
+      if (partido.ronda === 'dieciseisavos') return nombre;
+      
+      // Resolver desde partido source
+      let sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+      if (!sourceId) {
+        const match = nombre.match(/(F\d+)/);
+        if (match) sourceId = match[1];
+      }
+      if (!sourceId) return nombre;
+      
+      const sourcePartido = allPartidosFinal[sourceId];
+      if (!sourcePartido || !sourcePartido.jugado) return nombre;
+      
+      const sg1 = sourcePartido.goles_equipo1;
+      const sg2 = sourcePartido.goles_equipo2;
+      const sp1 = sourcePartido.penales_equipo1;
+      const sp2 = sourcePartido.penales_equipo2;
+      let sGanador = null;
+      if (sg1 > sg2) sGanador = resolverEquipoReal(sourcePartido, true);
+      else if (sg2 > sg1) sGanador = resolverEquipoReal(sourcePartido, false);
+      else if (sp1 !== null && sp2 !== null && sp1 !== sp2) {
+        sGanador = sp1 > sp2 ? resolverEquipoReal(sourcePartido, true) : resolverEquipoReal(sourcePartido, false);
+      }
+      
+      if (!sGanador) return nombre;
+      
+      const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
+      if (esPerdedor) {
+        const eq1Real = resolverEquipoReal(sourcePartido, true);
+        return sGanador === eq1Real ? resolverEquipoReal(sourcePartido, false) : eq1Real;
+      }
+      return sGanador;
+    };
+
     const getGanadorReal = (partido) => {
       if (!partido.jugado) return null;
       const g1 = partido.goles_equipo1;
       const g2 = partido.goles_equipo2;
-      if (g1 > g2) return partido.equipo1;
-      if (g2 > g1) return partido.equipo2;
+      if (g1 > g2) return resolverEquipoReal(partido, true);
+      if (g2 > g1) return resolverEquipoReal(partido, false);
       const p1 = partido.penales_equipo1;
       const p2 = partido.penales_equipo2;
       if (p1 !== null && p2 !== null && p1 !== p2) {
-        return p1 > p2 ? partido.equipo1 : partido.equipo2;
+        return p1 > p2 ? resolverEquipoReal(partido, true) : resolverEquipoReal(partido, false);
       }
       return null;
     };
@@ -456,7 +512,8 @@ async function recalcularTodosLosPuntos() {
     const getPerdedorReal = (partido) => {
       const ganador = getGanadorReal(partido);
       if (!ganador) return null;
-      return ganador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
+      const eq1Real = resolverEquipoReal(partido, true);
+      return ganador === eq1Real ? resolverEquipoReal(partido, false) : eq1Real;
     };
     
     for (const u of usuarios) {
@@ -527,18 +584,21 @@ async function recalcularTodosLosPuntos() {
         if (!partido) continue;
         
         // Determinar ganador según predicción del usuario
-        let predGanador = null;
-        const pg1 = pred.prediccion_equipo1;
-        const pg2 = pred.prediccion_equipo2;
-        const pp1 = pred.prediccion_penales_equipo1;
-        const pp2 = pred.prediccion_penales_equipo2;
+        // Usar prediccion_ganador primero (ya tiene el nombre real del equipo, no placeholder)
+        let predGanador = pred.prediccion_ganador || null;
         
-        if (pg1 > pg2) predGanador = partido.equipo1;
-        else if (pg2 > pg1) predGanador = partido.equipo2;
-        else if (pp1 !== null && pp2 !== null && pp1 !== pp2) {
-          predGanador = pp1 > pp2 ? partido.equipo1 : partido.equipo2;
-        } else if (pred.prediccion_ganador) {
-          predGanador = pred.prediccion_ganador;
+        // Fallback: calcular desde marcador si no hay prediccion_ganador
+        if (!predGanador) {
+          const pg1 = pred.prediccion_equipo1;
+          const pg2 = pred.prediccion_equipo2;
+          const pp1 = pred.prediccion_penales_equipo1;
+          const pp2 = pred.prediccion_penales_equipo2;
+          
+          if (pg1 > pg2) predGanador = partido.equipo1;
+          else if (pg2 > pg1) predGanador = partido.equipo2;
+          else if (pp1 !== null && pp2 !== null && pp1 !== pp2) {
+            predGanador = pp1 > pp2 ? partido.equipo1 : partido.equipo2;
+          }
         }
         
         if (!predGanador) continue;
@@ -555,9 +615,23 @@ async function recalcularTodosLosPuntos() {
         } else if (partido.ronda === 'final') {
           // El ganador de la final es campeón
           predEquiposPorRonda.campeon = predGanador;
-          // El perdedor es subcampeón (calcularlo)
-          const predPerdedor = predGanador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
-          predEquiposPorRonda.subcampeon = predPerdedor;
+          // El perdedor es subcampeón (calcularlo desde scores si equipo1/equipo2 son placeholders)
+          const pg1 = pred.prediccion_equipo1;
+          const pg2 = pred.prediccion_equipo2;
+          const pp1 = pred.prediccion_penales_equipo1;
+          const pp2 = pred.prediccion_penales_equipo2;
+          let predPerdedor = null;
+          if (pg1 > pg2) {
+            predPerdedor = predGanador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
+          } else if (pg2 > pg1) {
+            predPerdedor = predGanador === partido.equipo2 ? partido.equipo1 : partido.equipo2;
+          } else if (pp1 !== null && pp2 !== null && pp1 !== pp2) {
+            predPerdedor = predGanador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
+          }
+          // Solo guardar si no es un placeholder
+          if (predPerdedor && !predPerdedor.startsWith('Ganador') && !predPerdedor.startsWith('Perdedor')) {
+            predEquiposPorRonda.subcampeon = predPerdedor;
+          }
         }
       }
       
