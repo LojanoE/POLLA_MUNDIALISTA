@@ -1,7 +1,7 @@
 /* final.js - Fase Final: Sistema de pasos tipo cuestionario */
 
 import { db } from './firebase-config.js';
-import { collection, query, getDocs, doc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { requireAuth, updateNav, logout, getCurrentUser } from './auth.js';
 import { BANDERAS } from './data.js';
 
