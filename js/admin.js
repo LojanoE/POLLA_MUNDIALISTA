@@ -162,9 +162,8 @@ async function cargarPartidosGrupos() {
         const eq1Flag = getFlagUrl(p.equipo1);
         const eq2Flag = getFlagUrl(p.equipo2);
         const yaJugado = p.jugado;
-        const disabledAttr = yaJugado ? 'disabled' : '';
         const jugadoClass = yaJugado ? 'match-played' : '';
-        const jugadoBadge = yaJugado ? '<span class="match-badge played">✓ JUGADO</span>' : '<span class="match-badge pending">PENDIENTE</span>';
+        const jugadoBadge = yaJugado ? '<span class="match-badge played">✓ JUGADO (Editable)</span>' : '<span class="match-badge pending">PENDIENTE</span>';
         
         const div = document.createElement('div');
         div.className = `admin-match-card ${jugadoClass}`;
@@ -181,10 +180,10 @@ async function cargarPartidosGrupos() {
               <span class="match-team-name">${p.equipo1}</span>
             </div>
             <div class="match-score-center">
-              <input type="number" min="0" max="20" class="match-score-input" ${disabledAttr}
+              <input type="number" min="0" max="20" class="match-score-input"
                 data-id="${p.id}" data-field="g1" value="${p.goles_equipo1 ?? ''}" placeholder="0">
               <span class="match-separator">:</span>
-              <input type="number" min="0" max="20" class="match-score-input" ${disabledAttr}
+              <input type="number" min="0" max="20" class="match-score-input"
                 data-id="${p.id}" data-field="g2" value="${p.goles_equipo2 ?? ''}" placeholder="0">
             </div>
             <div class="match-team-right">
@@ -730,17 +729,17 @@ function renderizarRondaActual() {
           <div style="display:flex; flex-direction:column; align-items:center; gap:8px; min-width:130px;">
             <div style="display:flex; align-items:center; gap:6px;">
               <input type="number" min="0" max="20" style="width:55px; height:42px; text-align:center; font-size:1.1rem;"
-                data-field="g1" data-id="${p.id}" value="${g1}" ${yaJugado ? 'disabled' : ''} placeholder="0">
-              <span style="font-size:1.2rem;">:</span>
-              <input type="number" min="0" max="20" style="width:55px; height:42px; text-align:center; font-size:1.1rem;"
-                data-field="g2" data-id="${p.id}" value="${g2}" ${yaJugado ? 'disabled' : ''} placeholder="0">
+                data-field="g1" data-id="${p.id}" value="${g1}" placeholder="0">
+            <span style="font-size:1.2rem;">:</span>
+            <input type="number" min="0" max="20" style="width:55px; height:42px; text-align:center; font-size:1.1rem;"
+                data-field="g2" data-id="${p.id}" value="${g2}" placeholder="0">
             </div>
             <div class="penales-box ${penalesClass}" style="display:${mostrarPenales ? 'flex' : 'none'};">
               <input type="number" min="0" max="20" style="width:45px; height:35px; text-align:center; font-size:0.95rem;"
-                data-field="p1" data-id="${p.id}" value="${p1}" ${yaJugado ? 'disabled' : ''} placeholder="Pen">
+                data-field="p1" data-id="${p.id}" value="${p1}" placeholder="Pen">
               <span style="font-size:0.75rem; color:var(--text-muted);">Penales</span>
               <input type="number" min="0" max="20" style="width:45px; height:35px; text-align:center; font-size:0.95rem;"
-                data-field="p2" data-id="${p.id}" value="${p2}" ${yaJugado ? 'disabled' : ''} placeholder="Pen">
+                data-field="p2" data-id="${p.id}" value="${p2}" placeholder="Pen">
             </div>
           </div>
           <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px; justify-content:flex-end;">
@@ -888,7 +887,6 @@ function actualizarEstadoBotonGuardar() {
   let errores = 0;
   
   for (const p of partidos) {
-    if (resultadosFinal[p.id]?.jugado) continue;
     const pred = resultadosFinal[p.id];
     if (!pred || pred.g1 === '' || pred.g2 === '') {
       incompletos++;
@@ -910,11 +908,11 @@ function actualizarEstadoBotonGuardar() {
     status.style.color = 'var(--danger)';
   } else if (incompletos > 0) {
     btn.disabled = true;
-    status.textContent = `${jugados}/${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} completados`;
+    status.textContent = `${partidos.length - incompletos}/${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} completados`;
     status.style.color = 'var(--text-muted)';
   } else {
     btn.disabled = false;
-    status.textContent = `✓ ${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} listos para guardar`;
+    status.textContent = `✓ ${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} listos para guardar (incluye ${jugados} ya guardados)`;
     status.style.color = '#4caf50';
   }
 }
