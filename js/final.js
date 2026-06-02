@@ -169,7 +169,7 @@ function calcularEquipoDinamico(partido, esEquipo1) {
   
   if (!sourceId) return 'Por definir';
   
-  const esPerdedor = esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2;
+  let esPerdedor = esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2;
   // Fallback para tercer lugar
   if (partido.ronda === 'tercer_lugar' && !esPerdedor) {
     esPerdedor = true;
