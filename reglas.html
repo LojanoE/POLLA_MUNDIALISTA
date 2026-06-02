@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reglas - Polla Mundialista 2026</title>
+  <link rel="stylesheet" href="css/styles.css?v=1.0">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo">
+      <span class="trophy">🏆</span>
+      <div>
+        <h1>Mundial 2026</h1>
+        <span>Predicciones de la Polla</span>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <a href="grupos.html">🗓️ Fase Grupos</a>
+      <a href="final.html">🏆 Fase Final</a>
+      <a href="ranking.html">📊 Ranking</a>
+      <a href="reglas.html" style="color:var(--accent); font-weight:bold;">📋 Reglas</a>
+      <a href="admin.html" id="nav-admin" style="display:none;">⚙️ Admin</a>
+      <span id="nav-user" style="color:var(--accent); font-weight:bold;"></span>
+      <button id="nav-logout" style="display:none;">🚪 Salir</button>
+    </nav>
+  </header>
+
+  <div class="container">
+    <h2 style="color: var(--accent); text-align: center; margin-bottom: 10px; font-size: 2rem;">📋 Reglas de la Polla Mundialista</h2>
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 30px; font-size: 1.1rem;">Conoce cómo se puntúan tus predicciones</p>
+    
+    <div class="admin-section">
+      <h3>⚽ Etapa 1: Fase de Grupos</h3>
+      <div style="padding: 15px;">
+        <h4 style="color: var(--accent); margin-bottom: 15px;">Puntos por Partido</h4>
+        <ul style="list-style: none; padding: 0;">
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: gold; min-width: 40px;">3</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Marcador Exacto</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el resultado exacto del partido (ej: predijiste 2-1 y terminó 2-1)</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Ganador o Empate</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas quién gana o si empata, pero no el marcador exacto (ej: predijiste 2-1 y terminó 1-0)</span>
+            </div>
+          </li>
+        </ul>
+        
+        <h4 style="color: var(--accent); margin: 25px 0 15px;">Puntos Extra por Clasificación</h4>
+        <ul style="list-style: none; padding: 0;">
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: #cd7f32; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Equipo Clasificado</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Por cada equipo que aciertes que pasa a la fase final (sin importar la posición)</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: #cd7f32; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Posición Exacta</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Punto extra por cada equipo que aciertes en la posición exacta del grupo (1º, 2º o mejor 3º)</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="admin-section">
+      <h3>🏆 Etapa 2: Fase Final (Dieciseisavos en adelante)</h3>
+      <div style="padding: 15px;">
+        <h4 style="color: var(--accent); margin-bottom: 15px;">Puntos por Partido</h4>
+        <ul style="list-style: none; padding: 0;">
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: gold; min-width: 40px;">3</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Marcador Exacto (90 min)</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el marcador exacto de los 90 minutos reglamentarios</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Empate en 90 min</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas que hay empate en los 90 min (independiente del marcador exacto del empate)</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Ganador en 90 min</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el ganador en 90 minutos (pero no el marcador exacto)</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: gold; min-width: 40px;">3</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Penales Exactos</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Si hay empate y aciertas el marcador exacto de los penales (ej: predijiste 4-3 y resultó 4-3)</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Ganador de Penales</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Si hay empate y aciertas quién gana los penales (pero no el marcador exacto)</span>
+            </div>
+          </li>
+          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.5rem; font-weight: bold; color: #cd7f32; min-width: 40px;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block;">Equipo que Avanza</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el equipo que clasifica a la siguiente ronda (quien gana el partido)</span>
+            </div>
+          </li>
+        </ul>
+        
+        <div style="background: rgba(232, 197, 71, 0.1); border: 1px solid var(--accent); border-radius: 10px; padding: 15px; margin-top: 20px;">
+          <p style="color: var(--accent); font-weight: bold; margin: 0;">
+            💡 Máximo por partido: 4 puntos (3 por marcador exacto de 90 min + 1 por acertar quién avanza)
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="admin-section">
+      <h3>📝 Reglas Generales</h3>
+      <div style="padding: 15px;">
+        <ul style="list-style: none; padding: 0;">
+          <li style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary);">
+            🔒 <strong>Las predicciones se cierran al guardar</strong> — una vez que guardas tus predicciones, no podrás modificarlas.
+          </li>
+          <li style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary);">
+            ⏰ <strong>Fase de grupos primero</strong> — solo se habilita la fase de grupos al inicio. La fase final se activará cuando el administrador lo decida.
+          </li>
+          <li style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary);">
+            🏆 <strong>Ranking en tiempo real</strong> — la tabla de posiciones se actualiza automáticamente cuando el administrador recalcula los puntos.
+          </li>
+          <li style="padding: 10px 0; color: var(--text-secondary);">
+            ⚠️ <strong>Sin predicción = 0 puntos</strong> — si no ingresas predicción para un partido antes de que se juegue, obtienes 0 puntos en ese partido.
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="admin-section">
+      <h3>📊 Estructura del Torneo</h3>
+      <div style="padding: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+            <strong style="color: var(--accent); display: block; margin-bottom: 8px;">Fase de Grupos</strong>
+            <span style="color: var(--text-muted); font-size: 0.9rem;">12 grupos de 4 equipos cada uno. Los 2 primeros de cada grupo + los 8 mejores terceros avanzan.</span>
+          </div>
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+            <strong style="color: var(--accent); display: block; margin-bottom: 8px;">Fase Final</strong>
+            <span style="color: var(--text-muted); font-size: 0.9rem;">32 equipos en eliminación directa (dieciseisavos → octavos → cuartos → semifinal → final).</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/reglas.js?v=1.0"></script>
+</body>
+</html>
