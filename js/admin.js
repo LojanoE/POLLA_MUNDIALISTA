@@ -1003,7 +1003,7 @@ document.getElementById('btn-generar-fase-final').addEventListener('click', asyn
     let previewHtml = '<h4 style="color: var(--accent); margin-bottom: 15px;">📊 Tabla de Grupos</h4>';
     previewHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">';
     
-    for (const [grupo, partidos] of Object.entries(partidosGrupos)) {
+    for (const [grupo, partidos] of Object.entries(partidosPorGrupo)) {
       // Verificar que todos los partidos del grupo estén jugados
       const todosJugados = partidos.every(p => p.jugado && p.goles_equipo1 !== null && p.goles_equipo2 !== null);
       if (!todosJugados) {
