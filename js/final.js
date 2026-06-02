@@ -150,11 +150,30 @@ function recalcularTodosEquipos() {
   }
 }
 
+function extraerSourceDePlaceholder(equipoNombre) {
+  // Fallback: si no hay source_equipo en la BD, extraer del nombre del placeholder
+  // Ej: "Ganador F1" → "F1", "Perdedor F29" → "F29"
+  if (!equipoNombre) return null;
+  const match = equipoNombre.match(/(F\d+)/);
+  return match ? match[1] : null;
+}
+
 function calcularEquipoDinamico(partido, esEquipo1) {
-  const sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+  let sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+  
+  // Fallback: extraer source del nombre del placeholder si no está en la BD
+  if (!sourceId) {
+    const equipoNombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
+    sourceId = extraerSourceDePlaceholder(equipoNombre);
+  }
+  
   if (!sourceId) return 'Por definir';
   
-  const esPerdedor = partido.ronda === 'tercer_lugar';
+  const esPerdedor = esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2;
+  // Fallback para tercer lugar
+  if (partido.ronda === 'tercer_lugar' && !esPerdedor) {
+    esPerdedor = true;
+  }
   
   // Obtener predicción del partido source
   const predSource = prediccionesLocales[sourceId];
@@ -339,15 +358,18 @@ function handleInputChange(e) {
   // Actualizar penales y ganador visualmente
   actualizarCardVisual(id);
   
-  // Si cambió un partido de una ronda anterior, recalcular equipos y actualizar tabs
+  // SIEMPRE recalcular equipos de rondas posteriores cuando cambia cualquier partido
   const partido = partidosFinal.find(p => p.id === id);
   if (partido) {
-    const rondaIdx = RONDAS.indexOf(partido.ronda);
-    if (rondaIdx < rondaActualIndex) {
-      // Si cambiamos una ronda anterior, recalcular TODO
-      recalcularTodosEquipos();
+    // Recalcular TODOS los equipos (la cadena de dependencias puede ser larga)
+    recalcularTodosEquipos();
+    
+    // Si estamos viendo una ronda posterior a la editada, re-renderizar para mostrar nuevos equipos
+    const rondaEditadaIdx = RONDAS.indexOf(partido.ronda);
+    if (rondaEditadaIdx < rondaActualIndex) {
       renderizarRondaActual();
     }
+    
     // Actualizar tabs para mostrar rondas posteriores con datos
     actualizarTabsEstado();
   }
