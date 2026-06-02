@@ -4,7 +4,189 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fase Final - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=3.0">
+  <link rel="stylesheet" href="css/styles.css?v=4.0">
+  <style>
+    .steps-bar {
+      display: flex;
+      justify-content: space-between;
+      margin: 20px 0;
+      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .step-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 10px 8px;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.3s;
+      text-align: center;
+    }
+    .step-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .step-btn.active {
+      background: rgba(168, 213, 186, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: bold;
+    }
+    .step-btn.completed {
+      background: rgba(76, 175, 80, 0.2);
+      border-color: #4caf50;
+      color: #4caf50;
+    }
+    .step-btn .step-num {
+      display: block;
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    
+    .round-container {
+      min-height: 400px;
+    }
+    
+    .match-card {
+      position: relative;
+      transition: all 0.3s;
+    }
+    
+    .match-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .match-card.saved {
+      opacity: 0.7;
+      border-left: 4px solid #4caf50;
+    }
+    
+    .penales-box {
+      background: rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-top: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border: 1px dashed rgba(255,255,255,0.2);
+    }
+    
+    .penales-box.visible {
+      display: flex;
+    }
+    
+    .penales-box label {
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: bold;
+    }
+    
+    .winner-badge {
+      text-align: center;
+      margin-top: 8px;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      min-height: 24px;
+    }
+    
+    .winner-badge .winner-name {
+      color: var(--accent);
+    }
+    
+    .winner-badge .pending {
+      color: var(--danger);
+    }
+    
+    .winner-badge .placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin: 30px 0;
+      gap: 15px;
+    }
+    
+    .nav-buttons button {
+      padding: 12px 30px;
+      font-size: 1rem;
+    }
+    
+    .progress-info {
+      text-align: center;
+      margin: 15px 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+    
+    .save-actions {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 30px 0;
+      flex-wrap: wrap;
+    }
+    
+    .team-placeholder {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    
+    .team-placeholder .placeholder-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+    }
+    
+    @media (max-width: 768px) {
+      .steps-bar {
+        flex-direction: column;
+      }
+      .step-btn {
+        min-width: auto;
+      }
+      .nav-buttons {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
 <body>
 
@@ -39,39 +221,69 @@
       <a href="grupos.html" class="btn btn-primary" style="margin-top:20px;">Volver a Fase de Grupos</a>
     </div>
     
-    <div id="final-content">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h2 style="color: var(--accent); font-size: 1.3rem;">Ingresa tus predicciones para la Fase Final</h2>
-        <p style="color: var(--text-muted); margin-top: 10px;">3 pts marcador exacto • 1 pt ganador/empate • 3 pts penales exactos • 1 pt clasificado</p>
+    <div id="final-content" style="display:none;">
+      <div style="text-align: center; margin-bottom: 10px;">
+        <h2 style="color: var(--accent); font-size: 1.3rem;">🏆 Fase Final - Bracket Completo</h2>
+        <p style="color: var(--text-muted); margin-top: 8px; font-size: 0.85rem;">
+          Completa cada ronda. Los equipos se calculan automáticamente. Avanza con "Siguiente".
+        </p>
       </div>
       
-      <h3 class="round-title">Dieciseisavos de Final</h3>
-      <div id="final-dieciseisavos" class="matches-grid"></div>
+      <!-- Barra de progreso -->
+      <div class="progress-info" id="progress-text">Paso 1 de 6</div>
+      <div class="progress-bar">
+        <div class="progress-bar-fill" id="progress-fill" style="width: 16%;"></div>
+      </div>
       
-      <h3 class="round-title">Octavos de Final</h3>
-      <div id="final-octavos" class="matches-grid"></div>
-      
-      <h3 class="round-title">Cuartos de Final</h3>
-      <div id="final-cuartos" class="matches-grid"></div>
-      
-      <h3 class="round-title">Semifinales</h3>
-      <div id="final-semis" class="matches-grid"></div>
-      
-      <h3 class="round-title">Tercer Lugar</h3>
-      <div id="final-tercer" class="matches-grid"></div>
-      
-      <h3 class="round-title">Final</h3>
-      <div id="final-final" class="matches-grid"></div>
-      
-      <div style="text-align: center; margin: 40px 0;">
-        <button id="btn-save-final" class="btn btn-primary" style="padding: 15px 50px; font-size: 1.1rem;">
-          💾 Guardar Predicciones Fase Final
+      <!-- Tabs de pasos -->
+      <div class="steps-bar" id="steps-bar">
+        <button class="step-btn active" data-ronda="dieciseisavos">
+          <span class="step-num">1</span>
+          <span>Dieciseisavos</span>
         </button>
-        <div id="save-status" style="margin-top: 15px; color: var(--text-muted);"></div>
+        <button class="step-btn" data-ronda="octavos">
+          <span class="step-num">2</span>
+          <span>Octavos</span>
+        </button>
+        <button class="step-btn" data-ronda="cuartos">
+          <span class="step-num">3</span>
+          <span>Cuartos</span>
+        </button>
+        <button class="step-btn" data-ronda="semis">
+          <span class="step-num">4</span>
+          <span>Semis</span>
+        </button>
+        <button class="step-btn" data-ronda="tercer_lugar">
+          <span class="step-num">5</span>
+          <span>3er Lugar</span>
+        </button>
+        <button class="step-btn" data-ronda="final">
+          <span class="step-num">6</span>
+          <span>Final</span>
+        </button>
       </div>
+      
+      <!-- Contenedor de la ronda actual -->
+      <div class="round-container" id="round-container">
+        <div class="spinner" style="margin: 50px auto;"></div>
+      </div>
+      
+      <!-- Botones de navegación -->
+      <div class="nav-buttons">
+        <button id="btn-prev" class="btn btn-secondary" disabled>← Anterior</button>
+        <button id="btn-next" class="btn btn-primary">Siguiente →</button>
+      </div>
+      
+      <!-- Acciones de guardado -->
+      <div class="save-actions">
+        <button id="btn-save-progress" class="btn btn-info">💾 Guardar Progreso</button>
+        <button id="btn-save-final" class="btn btn-accent" disabled>✅ Finalizar y Guardar Todo</button>
+      </div>
+      
+      <div id="save-status" style="text-align: center; color: var(--text-muted); margin-top: 10px;"></div>
     </div>
   </div>
 
-  <script type="module" src="js/final.js?v=3.0"></script>
+  <script type="module" src="js/final.js?v=4.0"></script>
 </body>
 </html>
