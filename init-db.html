@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inicializar Base de Datos - Polla Mundialista</title>
-  <link rel="stylesheet" href="css/styles.css?v=2.0">
+  <link rel="stylesheet" href="css/styles.css?v=3.0">
 </head>
 <body>
 
@@ -89,7 +89,7 @@
         const partidosFinal = generarPartidosFinal();
         for (const p of partidosFinal) {
           const ref = doc(db, 'partidos_final', p.id);
-          batch.set(ref, {
+          const data = {
             ronda: p.ronda,
             numero: p.numero,
             equipo1: p.equipo1,
@@ -100,7 +100,12 @@
             penales_equipo2: null,
             jugado: false,
             ganador: null
-          });
+          };
+          if (p.source_equipo1 !== undefined) data.source_equipo1 = p.source_equipo1;
+          if (p.source_equipo2 !== undefined) data.source_equipo2 = p.source_equipo2;
+          if (p.perdedor_source1 !== undefined) data.perdedor_source1 = p.perdedor_source1;
+          if (p.perdedor_source2 !== undefined) data.perdedor_source2 = p.perdedor_source2;
+          batch.set(ref, data);
         }
         
         // 3. Crear documento de config

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel Admin - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=2.0">
+  <link rel="stylesheet" href="css/styles.css?v=3.0">
 </head>
 <body>
 
@@ -58,6 +58,18 @@
       </p>
     </div>
     
+    <!-- Generar Fase Final Automáticamente -->
+    <div class="admin-section">
+      <h3>⚙️ Generar Fase Final</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+        Después de ingresar todos los resultados de la fase de grupos, presiona este botón para calcular automáticamente quién clasificó y rellenar los 16 partidos de dieciseisavos con los equipos reales.
+      </p>
+      <button id="btn-generar-fase-final" class="btn btn-primary" style="margin-bottom: 15px;">⚙️ Generar Fase Final Automáticamente</button>
+      <div id="tabla-grupos-preview" style="display: none; margin-top: 20px;"></div>
+      <div id="mejores-terceros-preview" style="display: none; margin-top: 20px;"></div>
+      <div id="generar-status" style="margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;"></div>
+    </div>
+    
     <!-- Gestión de Usuarios -->
     <div class="admin-section">
       <h3>👥 Gestión de Usuarios</h3>
@@ -93,6 +105,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/admin.js?v=2.0"></script>
+  <script type="module" src="js/admin.js?v=3.0"></script>
 </body>
 </html>
