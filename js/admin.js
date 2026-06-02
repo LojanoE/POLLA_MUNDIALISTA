@@ -1426,4 +1426,223 @@ document.getElementById('btn-reset-db').addEventListener('click', async () => {
   });
 });
 
+// ===== GESTIÓN DE USUARIOS =====
+
+let currentSearchUser = null;
+
+// Buscar usuarios
+document.getElementById('btn-search-user').addEventListener('click', async () => {
+  const cedula = document.getElementById('search-cedula').value.trim();
+  const alias = document.getElementById('search-alias').value.trim();
+  const resultsDiv = document.getElementById('users-search-results');
+  
+  if (!cedula && !alias) {
+    showToast('Aviso', 'Ingresa cédula o alias para buscar', 'warning');
+    return;
+  }
+  
+  resultsDiv.innerHTML = '<div class="spinner"></div>';
+  
+  try {
+    let usuarios = [];
+    
+    if (cedula) {
+      const q = query(collection(db, 'users'), where('cedula', '==', cedula));
+      const snap = await getDocs(q);
+      snap.forEach(d => usuarios.push({ id: d.id, ...d.data() }));
+    } else if (alias) {
+      const q = query(collection(db, 'users'));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.alias.toLowerCase().includes(alias.toLowerCase())) {
+          usuarios.push({ id: d.id, ...data });
+        }
+      });
+    }
+    
+    if (usuarios.length === 0) {
+      resultsDiv.innerHTML = '<p style="color: var(--text-muted); text-align:center; padding:20px;">No se encontraron usuarios</p>';
+      return;
+    }
+    
+    let html = `
+      <table class="ranking-table" style="width:100%; margin-top: 15px;">
+        <thead>
+          <tr>
+            <th>Cédula</th>
+            <th>Alias</th>
+            <th>Pts Grupos</th>
+            <th>Pts Final</th>
+            <th>Pts Total</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    for (const u of usuarios) {
+      html += `
+        <tr>
+          <td>${u.cedula}</td>
+          <td>${u.alias}</td>
+          <td>${u.puntos_fase_grupos || 0}</td>
+          <td>${u.puntos_fase_final || 0}</td>
+          <td style="font-weight:bold; color:var(--accent);">${u.puntos_total || 0}</td>
+          <td>
+            <button class="btn btn-info" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 5px;" 
+              onclick="window.verPrediccionesUsuario('${u.cedula}', '${u.alias}')">📋 Ver</button>
+            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;" 
+              onclick="window.eliminarUsuario('${u.cedula}', '${u.alias}')">🗑️ Eliminar</button>
+          </td>
+        </tr>
+      `;
+    }
+    
+    html += '</tbody></table>';
+    resultsDiv.innerHTML = html;
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'Error buscando usuarios', 'error');
+    resultsDiv.innerHTML = '<p style="color: var(--danger);">Error en la búsqueda</p>';
+  }
+});
+
+// Ver predicciones de un usuario
+window.verPrediccionesUsuario = async (cedula, alias) => {
+  currentSearchUser = { cedula, alias };
+  const container = document.getElementById('user-predictions-container');
+  const section = document.getElementById('user-predictions-section');
+  
+  container.innerHTML = '<div class="spinner"></div>';
+  section.style.display = 'block';
+  
+  try {
+    const userId = `${cedula}_${alias}`;
+    
+    // Obtener predicciones de grupos
+    const predsGruposQ = query(collection(db, 'predicciones_grupos'), where('user_id', '==', userId));
+    const predsGruposSnap = await getDocs(predsGruposQ);
+    const predsGrupos = [];
+    predsGruposSnap.forEach(d => predsGrupos.push(d.data()));
+    
+    // Obtener predicciones de final
+    const predsFinalQ = query(collection(db, 'predicciones_final'), where('user_id', '==', userId));
+    const predsFinalSnap = await getDocs(predsFinalQ);
+    const predsFinal = [];
+    predsFinalSnap.forEach(d => predsFinal.push(d.data()));
+    
+    if (predsGrupos.length === 0 && predsFinal.length === 0) {
+      container.innerHTML = '<p style="color: var(--text-muted);">Este usuario no tiene predicciones registradas</p>';
+      return;
+    }
+    
+    let html = `<h5 style="color: var(--accent); margin: 20px 0 10px;">Usuario: ${alias} (${cedula})</h5>`;
+    
+    // Fase de Grupos
+    if (predsGrupos.length > 0) {
+      html += '<h6 style="color: var(--text-secondary); margin: 15px 0 10px;">⚽ Fase de Grupos</h6>';
+      html += '<table class="ranking-table" style="width:100%;"><thead><tr><th>Partido</th><th>Predicción</th><th>Acciones</th></tr></thead><tbody>';
+      
+      for (const p of predsGrupos) {
+        html += `
+          <tr>
+            <td>${p.partido_id}</td>
+            <td style="font-weight:bold;">${p.prediccion_equipo1} - ${p.prediccion_equipo2}</td>
+            <td>
+              <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" 
+                onclick="window.borrarPrediccion('${cedula}', '${alias}', '${p.partido_id}', 'grupos')">🗑️ Borrar</button>
+            </td>
+          </tr>
+        `;
+      }
+      html += '</tbody></table>';
+    }
+    
+    // Fase Final
+    if (predsFinal.length > 0) {
+      html += '<h6 style="color: var(--text-secondary); margin: 15px 0 10px;">🏆 Fase Final</h6>';
+      html += '<table class="ranking-table" style="width:100%;"><thead><tr><th>Partido</th><th>Predicción</th><th>Penales</th><th>Ganador</th><th>Acciones</th></tr></thead><tbody>';
+      
+      for (const p of predsFinal) {
+        html += `
+          <tr>
+            <td>${p.partido_id}</td>
+            <td style="font-weight:bold;">${p.prediccion_equipo1} - ${p.prediccion_equipo2}</td>
+            <td>${p.prediccion_penales_equipo1 ?? '-'} - ${p.prediccion_penales_equipo2 ?? '-'}</td>
+            <td>${p.prediccion_ganador ?? '-'}</td>
+            <td>
+              <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" 
+                onclick="window.borrarPrediccion('${cedula}', '${alias}', '${p.partido_id}', 'final')">🗑️ Borrar</button>
+            </td>
+          </tr>
+        `;
+      }
+      html += '</tbody></table>';
+    }
+    
+    container.innerHTML = html;
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'Error cargando predicciones', 'error');
+    container.innerHTML = '<p style="color: var(--danger);">Error cargando predicciones</p>';
+  }
+};
+
+// Borrar predicción individual
+window.borrarPrediccion = async (cedula, alias, partidoId, tipo) => {
+  if (!confirm(`¿Eliminar predicción de ${alias} para el partido ${partidoId}?`)) return;
+  
+  try {
+    const docId = `${cedula}_${alias}_${partidoId}`;
+    const coleccion = tipo === 'grupos' ? 'predicciones_grupos' : 'predicciones_final';
+    await deleteDoc(doc(db, coleccion, docId));
+    
+    showToast('Éxito', 'Predicción eliminada', 'success');
+    window.verPrediccionesUsuario(cedula, alias);
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'Error eliminando predicción', 'error');
+  }
+};
+
+// Eliminar usuario completo
+window.eliminarUsuario = async (cedula, alias) => {
+  if (!confirm(`¿ESTÁS SEGURO?\n\nSe eliminará permanentemente:\n- Usuario: ${alias}\n- Cédula: ${cedula}\n- TODAS sus predicciones\n- TODOS sus puntos\n\n¿Deseas continuar?`)) {
+    return;
+  }
+  
+  try {
+    const userId = `${cedula}_${alias}`;
+    
+    // 1. Borrar predicciones de grupos
+    const predsGruposQ = query(collection(db, 'predicciones_grupos'), where('user_id', '==', userId));
+    const predsGruposSnap = await getDocs(predsGruposQ);
+    for (const d of predsGruposSnap.docs) {
+      await deleteDoc(doc(db, 'predicciones_grupos', d.id));
+    }
+    
+    // 2. Borrar predicciones de final
+    const predsFinalQ = query(collection(db, 'predicciones_final'), where('user_id', '==', userId));
+    const predsFinalSnap = await getDocs(predsFinalQ);
+    for (const d of predsFinalSnap.docs) {
+      await deleteDoc(doc(db, 'predicciones_final', d.id));
+    }
+    
+    // 3. Borrar usuario
+    await deleteDoc(doc(db, 'users', userId));
+    
+    showToast('Éxito', `Usuario ${alias} eliminado completamente`, 'success');
+    document.getElementById('users-search-results').innerHTML = '';
+    document.getElementById('user-predictions-section').style.display = 'none';
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'Error eliminando usuario', 'error');
+  }
+};
+
 init();
