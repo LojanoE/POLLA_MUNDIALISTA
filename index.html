@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Polla Mundialista 2026 - Login</title>
-  <link rel="stylesheet" href="css/styles.css?v=1.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.0">
 </head>
 <body>
 
@@ -62,7 +62,7 @@
 
   <script type="module">
     import { db } from './js/firebase-config.js';
-    import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { doc, getDoc, setDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { setCurrentUser, ADMIN_USER, ADMIN_PASS } from './js/auth.js';
     
     const alertBox = document.getElementById('alert-box');
@@ -85,16 +85,24 @@
       }
       
       try {
-        const userRef = doc(db, 'users', cedula);
+        const userId = `${cedula}_${alias}`;
+        const userRef = doc(db, 'users', userId);
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          const userData = userSnap.data();
-          if (userData.alias !== alias) {
-            showAlert('El alias no coincide con la cédula registrada', 'danger');
+          // Usuario existente, login normal
+          setCurrentUser(cedula, alias);
+          window.location.href = 'grupos.html';
+        } else {
+          // Verificar cuántos aliases tiene esta cédula
+          const q = query(collection(db, 'users'), where('cedula', '==', cedula));
+          const existingSnap = await getDocs(q);
+          
+          if (existingSnap.size >= 2) {
+            showAlert('Esta cédula ya tiene 2 participantes registrados (máximo permitido)', 'danger');
             return;
           }
-        } else {
+          
           // Crear nuevo usuario
           await setDoc(userRef, {
             cedula,
@@ -104,10 +112,10 @@
             puntos_total: 0,
             creado: new Date().toISOString()
           });
+          
+          setCurrentUser(cedula, alias);
+          window.location.href = 'grupos.html';
         }
-        
-        setCurrentUser(cedula, alias);
-        window.location.href = 'grupos.html';
         
       } catch (err) {
         console.error(err);

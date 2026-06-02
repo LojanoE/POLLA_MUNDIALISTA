@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel Admin - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=1.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.0">
 </head>
 <body>
 
@@ -58,6 +58,22 @@
       </p>
     </div>
     
+    <!-- Gestión de Usuarios -->
+    <div class="admin-section">
+      <h3>👥 Gestión de Usuarios</h3>
+      <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <input type="text" id="search-cedula" placeholder="Buscar por cédula..." style="padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); flex: 1; min-width: 200px;">
+        <input type="text" id="search-alias" placeholder="Buscar por alias..." style="padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); flex: 1; min-width: 200px;">
+        <button id="btn-search-user" class="btn btn-primary" style="padding: 10px 20px;">🔍 Buscar</button>
+      </div>
+      <div id="users-search-results"></div>
+      
+      <div id="user-predictions-section" style="display: none; margin-top: 30px;">
+        <h4 style="color: var(--accent); margin-bottom: 15px;">📋 Predicciones del Usuario</h4>
+        <div id="user-predictions-container"></div>
+      </div>
+    </div>
+    
     <!-- Resultados Fase de Grupos -->
     <div class="admin-section">
       <h3>⚽ Ingresar Resultados - Fase de Grupos</h3>
@@ -77,6 +93,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/admin.js?v=1.0"></script>
+  <script type="module" src="js/admin.js?v=2.0"></script>
 </body>
 </html>

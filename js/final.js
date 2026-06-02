@@ -180,7 +180,7 @@ async function cargarPrediccionesUsuario() {
     
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.user_id === user.cedula) {
+      if (data.user_id === `${user.cedula}_${user.alias}`) {
         prediccionesGuardadasIds.add(data.partido_id);
         prediccionesLocales[data.partido_id] = {
           g1: data.prediccion_equipo1 ?? '',
@@ -222,11 +222,11 @@ document.getElementById('btn-save-final').addEventListener('click', async () => 
       
       if (g1 === null || g2 === null) continue;
       
-      const docId = `${user.cedula}_${partidoId}`;
+      const docId = `${user.cedula}_${user.alias}_${partidoId}`;
       const ref = doc(db, 'predicciones_final', docId);
       
       batch.set(ref, {
-        user_id: user.cedula,
+        user_id: `${user.cedula}_${user.alias}`,
         partido_id: partidoId,
         prediccion_equipo1: g1,
         prediccion_equipo2: g2,
