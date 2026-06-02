@@ -36,13 +36,24 @@
       
       <hr style="border-color: var(--border); margin: 30px 0;">
       
+      <h3 style="color: var(--danger); margin-bottom: 15px;">⚠️ Zona Peligrosa</h3>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">
+        Borra TODOS los partidos, predicciones, configuración e instituciones. Los usuarios registrados NO se borran.
+      </p>
+      <button id="btn-reset" class="btn btn-danger btn-block" style="margin-bottom: 15px;">
+        🗑️ RESETEAR TODA LA BASE DE DATOS
+      </button>
+      <div id="reset-status" style="color: var(--text-muted); font-size: 0.9rem;"></div>
+      
+      <hr style="border-color: var(--border); margin: 30px 0;">
+      
       <a href="index.html" class="btn btn-primary btn-block">← Volver al Login</a>
     </div>
   </div>
 
   <script type="module">
     import { db } from './js/firebase-config.js';
-    import { collection, getDocs, writeBatch, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { collection, getDocs, writeBatch, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { generarPartidosGrupos, generarPartidosFinal, generarInstitucionesPorDefecto } from './js/data.js';
     
     const alertBox = document.getElementById('alert-box');
@@ -59,13 +70,14 @@
       status.textContent = 'Inicializando...';
       
       try {
-        // Verificar si ya existen partidos
+        // Verificar si ya existen partidos (advertencia pero permitir sobrescribir)
         const existing = await getDocs(collection(db, 'partidos_grupos'));
         if (!existing.empty) {
-          showAlert('⚠️ Ya existen partidos en la base de datos. Si quieres reiniciar, elimínalos primero desde Firebase Console.', 'danger');
-          btn.disabled = false;
-          status.textContent = '';
-          return;
+          if (!confirm('⚠️ Ya existen partidos en la base de datos. ¿Sobrescribir TODO (partidos + config + instituciones)? Las predicciones de usuarios se mantendrán.')) {
+            btn.disabled = false;
+            status.textContent = '';
+            return;
+          }
         }
         
         const batch = writeBatch(db);
@@ -132,6 +144,74 @@
         console.error(err);
         showAlert('Error inicializando base de datos: ' + err.message, 'danger');
         status.textContent = '';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    
+    // ===== RESETEAR TODA LA BASE DE DATOS =====
+    document.getElementById('btn-reset').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-reset');
+      const resetStatus = document.getElementById('reset-status');
+      
+      const confirm1 = confirm('🗑️ ¿ESTÁS SEGURO DE RESETEAR TODA LA BASE DE DATOS?\n\nSe eliminará permanentemente:\n• Todos los partidos (grupos + final)\n• Todas las predicciones de usuarios\n• Configuración del torneo\n• Instituciones\n\nNO se eliminarán los usuarios registrados.\n\n¿Deseas continuar?');
+      if (!confirm1) return;
+      
+      const confirm2 = confirm('⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER.\n\n¿Confirmas que quieres BORRAR TODO?');
+      if (!confirm2) return;
+      
+      btn.disabled = true;
+      resetStatus.textContent = 'Borrando datos...';
+      
+      try {
+        let totalBorrados = 0;
+        
+        // Borrar partidos de grupos
+        const gruposSnap = await getDocs(collection(db, 'partidos_grupos'));
+        for (const d of gruposSnap.docs) {
+          await deleteDoc(doc(db, 'partidos_grupos', d.id));
+          totalBorrados++;
+        }
+        
+        // Borrar partidos de fase final
+        const finalSnap = await getDocs(collection(db, 'partidos_final'));
+        for (const d of finalSnap.docs) {
+          await deleteDoc(doc(db, 'partidos_final', d.id));
+          totalBorrados++;
+        }
+        
+        // Borrar predicciones de grupos
+        const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
+        for (const d of predsGruposSnap.docs) {
+          await deleteDoc(doc(db, 'predicciones_grupos', d.id));
+          totalBorrados++;
+        }
+        
+        // Borrar predicciones de final
+        const predsFinalSnap = await getDocs(collection(db, 'predicciones_final'));
+        for (const d of predsFinalSnap.docs) {
+          await deleteDoc(doc(db, 'predicciones_final', d.id));
+          totalBorrados++;
+        }
+        
+        // Borrar config
+        await deleteDoc(doc(db, 'config', 'app_config'));
+        totalBorrados++;
+        
+        // Borrar instituciones
+        const instSnap = await getDocs(collection(db, 'instituciones'));
+        for (const d of instSnap.docs) {
+          await deleteDoc(doc(db, 'instituciones', d.id));
+          totalBorrados++;
+        }
+        
+        showAlert(`✅ Base de datos reseteada. Se eliminaron ${totalBorrados} documentos. Ahora puedes volver a inicializar.`, 'success');
+        resetStatus.innerHTML = '<span style="color: #4caf50;">✅ Reset completado. La base de datos está vacía.</span>';
+        
+      } catch (err) {
+        console.error(err);
+        showAlert('Error al resetear: ' + err.message, 'danger');
+        resetStatus.textContent = '';
       } finally {
         btn.disabled = false;
       }
