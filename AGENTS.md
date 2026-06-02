@@ -17,7 +17,9 @@ Vanilla HTML/CSS/JS frontend for a soccer-prediction pool. No build step, no pac
 | `final.html` + `js/final.js` | Participants predict knockout-stage scores + penalties + winner |
 | `admin.html` + `js/admin.js` | Admin enters real results, edits knockout teams, enables final phase, recalculates scores |
 | `ranking.html` + `js/ranking.js` | Live leaderboard (onSnapshot listener) |
-| `init-db.html` | One-time setup page that seeds Firestore with all matches and config |
+| `init-db.html` | One-time setup page that seeds Firestore with all matches and config (also accessible from admin panel) |
+| `reglas.html` + `js/reglas.js` | Rules page visible to all users (no auth required) |
+| `diagnostico.html` | Firebase connection diagnostic tool |
 | `js/firebase-config.js` | Hardcoded Firebase config (public web API key) |
 | `js/auth.js` | Session helpers. Admin creds: `ADMIN` / `Mirador12345` |
 | `js/data.js` | 48 teams in 12 groups, ISO flag codes, fixture generators |
@@ -54,6 +56,9 @@ All JS files are ES modules using `import` with:
 - Full CDN URLs for Firebase SDK (`https://www.gstatic.com/firebasejs/10.12.2/...`)
 
 Pages reference scripts with `<script type="module" src="...">`.
+
+## Cache busting / versioning
+All CSS and JS references use `?v=1.0` query parameters to force browser refresh during testing. Bump this version (e.g., `?v=1.1`) when making changes to ensure users get the latest files without hard-refreshing.
 
 ## What not to add
 - Do NOT add a build tool, bundler, or framework unless explicitly requested.
