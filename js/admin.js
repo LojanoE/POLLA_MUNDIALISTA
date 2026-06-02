@@ -159,35 +159,38 @@ async function cargarPartidosGrupos() {
           eq2: p.equipo2
         };
         
-        const div = document.createElement('div');
-        div.className = 'admin-match-input';
-        div.dataset.id = p.id;
-        div.style.flexWrap = 'wrap';
-        div.style.gap = '15px';
-        
         const eq1Flag = getFlagUrl(p.equipo1);
         const eq2Flag = getFlagUrl(p.equipo2);
-        const yaJugado = p.jugado ? 'disabled' : '';
+        const yaJugado = p.jugado;
+        const disabledAttr = yaJugado ? 'disabled' : '';
+        const jugadoClass = yaJugado ? 'match-played' : '';
+        const jugadoBadge = yaJugado ? '<span class="match-badge played">✓ JUGADO</span>' : '<span class="match-badge pending">PENDIENTE</span>';
+        
+        const div = document.createElement('div');
+        div.className = `admin-match-card ${jugadoClass}`;
+        div.dataset.id = p.id;
         
         div.innerHTML = `
-          <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-            <small style="color:var(--text-muted);">${p.id}</small>
-            <span style="color:var(--accent); font-size:0.8rem;">${p.grupo}</span>
+          <div class="match-header">
+            <span class="match-id">${p.id}</span>
+            ${jugadoBadge}
           </div>
-          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:150px;">
-            <img src="${eq1Flag}" style="width:28px; height:20px; border-radius:3px;" onerror="this.src='https://flagcdn.com/w40/xx.png'">
-            <span style="font-weight:600; flex:1;">${p.equipo1}</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:5px; flex:0 0 auto;">
-            <input type="number" min="0" max="20" style="width:50px; height:36px; text-align:center;"
-              data-id="${p.id}" data-field="g1" value="${p.goles_equipo1 ?? ''}" ${yaJugado} placeholder="0">
-            <span>:</span>
-            <input type="number" min="0" max="20" style="width:50px; height:36px; text-align:center;"
-              data-id="${p.id}" data-field="g2" value="${p.goles_equipo2 ?? ''}" ${yaJugado} placeholder="0">
-          </div>
-          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:150px; justify-content:flex-end;">
-            <span style="font-weight:600; text-align:right; flex:1;">${p.equipo2}</span>
-            <img src="${eq2Flag}" style="width:28px; height:20px; border-radius:3px;" onerror="this.src='https://flagcdn.com/w40/xx.png'">
+          <div class="match-body">
+            <div class="match-team-left">
+              <img src="${eq1Flag}" class="match-flag" alt="${p.equipo1}" onerror="this.src='https://flagcdn.com/w40/xx.png'">
+              <span class="match-team-name">${p.equipo1}</span>
+            </div>
+            <div class="match-score-center">
+              <input type="number" min="0" max="20" class="match-score-input" ${disabledAttr}
+                data-id="${p.id}" data-field="g1" value="${p.goles_equipo1 ?? ''}" placeholder="0">
+              <span class="match-separator">:</span>
+              <input type="number" min="0" max="20" class="match-score-input" ${disabledAttr}
+                data-id="${p.id}" data-field="g2" value="${p.goles_equipo2 ?? ''}" placeholder="0">
+            </div>
+            <div class="match-team-right">
+              <span class="match-team-name">${p.equipo2}</span>
+              <img src="${eq2Flag}" class="match-flag" alt="${p.equipo2}" onerror="this.src='https://flagcdn.com/w40/xx.png'">
+            </div>
           </div>
         `;
         
