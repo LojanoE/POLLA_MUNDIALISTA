@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnóstico Firebase - Polla Mundialista</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #1a1a2e; color: #eee; }
+    .test { padding: 15px; margin: 10px 0; border-radius: 8px; background: #16213e; }
+    .success { border-left: 4px solid #4caf50; }
+    .error { border-left: 4px solid #f44336; }
+    .pending { border-left: 4px solid #ff9800; }
+    h1 { color: #e94560; }
+    button { padding: 12px 24px; background: #e94560; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    button:hover { background: #c13651; }
+    pre { background: #0f3460; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; margin-left: 10px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h1>🔧 Diagnóstico de Conexión Firebase</h1>
+  
+  <div id="tests">
+    <div class="test pending" id="test-init">
+      <strong>⏳ Inicialización Firebase</strong>
+      <div class="detail"></div>
+    </div>
+    <div class="test pending" id="test-config">
+      <strong>⏳ Configuración</strong>
+      <div class="detail"></div>
+    </div>
+    <div class="test pending" id="test-connection">
+      <strong>⏳ Conexión Firestore</strong>
+      <div class="detail"></div>
+    </div>
+    <div class="test pending" id="test-write">
+      <strong>⏳ Prueba de Escritura</strong>
+      <div class="detail"></div>
+    </div>
+    <div class="test pending" id="test-read">
+      <strong>⏳ Prueba de Lectura</strong>
+      <div class="detail"></div>
+    </div>
+    <div class="test pending" id="test-collections">
+      <strong>⏳ Verificar Colecciones Existentes</strong>
+      <div class="detail"></div>
+    </div>
+  </div>
+  
+  <div style="margin-top: 30px; text-align: center;">
+    <button id="btn-test" onclick="runDiagnostics()">🚀 Ejecutar Diagnóstico</button>
+    <button id="btn-init-db" onclick="window.location.href='init-db.html'" style="margin-left: 10px; background: #4caf50;">Ir a init-db.html</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCvDxv2rEaOf0dgVDSkxL-uno5GWn-p1yg",
+      authDomain: "polla-mundialista-83633.firebaseapp.com",
+      projectId: "polla-mundialista-83633",
+      storageBucket: "polla-mundialista-83633.firebasestorage.app",
+      messagingSenderId: "763597088060",
+      appId: "1:763597088060:web:10aa97544e083e516faa39",
+      measurementId: "G-3PG30XT6TY"
+    };
+
+    function updateTest(id, status, message, detail = '') {
+      const el = document.getElementById(id);
+      el.className = `test ${status}`;
+      const icon = status === 'success' ? '✅' : status === 'error' ? '❌' : '⏳';
+      el.querySelector('strong').textContent = `${icon} ${el.querySelector('strong').textContent.replace(/^[⏳✅❌]\s*/, '')}`;
+      el.querySelector('.detail').innerHTML = message + (detail ? `<pre>${detail}</pre>` : '');
+    }
+
+    window.runDiagnostics = async function() {
+      const btn = document.getElementById('btn-test');
+      btn.disabled = true;
+      btn.innerHTML = 'Ejecutando... <span class="spinner"></span>';
+
+      try {
+        // 1. Inicialización
+        updateTest('test-init', 'pending', 'Probando inicialización...');
+        const app = initializeApp(firebaseConfig);
+        updateTest('test-init', 'success', 'Firebase inicializado correctamente');
+
+        // 2. Configuración
+        updateTest('test-config', 'pending', 'Verificando configuración...');
+        const configDetails = `
+Project ID: ${firebaseConfig.projectId}
+Auth Domain: ${firebaseConfig.authDomain}
+App ID: ${firebaseConfig.appId}
+        `.trim();
+        updateTest('test-config', 'success', 'Configuración cargada:', configDetails);
+
+        // 3. Conexión Firestore
+        updateTest('test-connection', 'pending', 'Probando conexión a Firestore...');
+        const db = getFirestore(app);
+        updateTest('test-connection', 'success', 'Conexión a Firestore establecida');
+
+        // 4. Prueba de escritura
+        updateTest('test-write', 'pending', 'Probando escritura en Firestore...');
+        const testRef = doc(db, '_diagnostico', 'test');
+        await setDoc(testRef, { 
+          timestamp: new Date().toISOString(),
+          mensaje: 'Prueba de conexión exitosa'
+        });
+        updateTest('test-write', 'success', 'Escritura exitosa en colección _diagnostico');
+
+        // 5. Prueba de lectura
+        updateTest('test-read', 'pending', 'Probando lectura desde Firestore...');
+        const testSnap = await getDoc(testRef);
+        if (testSnap.exists()) {
+          updateTest('test-read', 'success', 'Lectura exitosa:', JSON.stringify(testSnap.data(), null, 2));
+        } else {
+          updateTest('test-read', 'error', 'Documento no encontrado después de escribir');
+        }
+
+        // 6. Verificar colecciones principales
+        updateTest('test-collections', 'pending', 'Verificando colecciones...');
+        const colecciones = ['partidos_grupos', 'partidos_final', 'config'];
+        const resultados = [];
+        
+        for (const colName of colecciones) {
+          try {
+            const colRef = collection(db, colName);
+            const snap = await getDocs(colRef);
+            resultados.push(`${colName}: ${snap.size} documentos ${snap.size > 0 ? '✅' : '⚠️ (vacía)'}`);
+          } catch (e) {
+            resultados.push(`${colName}: ❌ Error - ${e.message}`);
+          }
+        }
+        
+        updateTest('test-collections', 'success', 'Colecciones verificadas:', resultados.join('\n'));
+
+      } catch (error) {
+        console.error(error);
+        updateTest('test-init', 'error', `Error: ${error.message}`, error.stack);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🚀 Ejecutar Diagnóstico';
+      }
+    };
+
+    // Auto-ejecutar al cargar
+    window.addEventListener('load', runDiagnostics);
+  </script>
+</body>
+</html>
