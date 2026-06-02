@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Simular Fase de Grupos - Polla Mundialista</title>
+  <link rel="stylesheet" href="css/styles.css?v=3.0">
+  <style>
+    .sim-container { max-width: 700px; margin: 40px auto; padding: 20px; }
+    .sim-btn { font-size: 1.1rem; padding: 12px 24px; margin: 8px; }
+    .log { background: #1a1a1a; color: #a8d5ba; padding: 15px; border-radius: 8px; 
+           font-family: monospace; font-size: 0.85rem; max-height: 500px; overflow-y: auto; margin-top: 20px; border: 1px solid #4a4a3a; }
+    .success { color: #a8d5ba; }
+    .error { color: #e74c3c; }
+    .warning { color: #f39c12; }
+    .info { color: #7fb3d3; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+    .stat-card { background: #252515; padding: 10px; border-radius: 6px; text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="sim-container card">
+    <h1>🧪 Simulador de Fase de Grupos</h1>
+    <p style="color: var(--text-muted); margin-bottom: 20px;">
+      Este script creará 5 usuarios ficticios con predicciones aleatorias para los 72 partidos de la fase de grupos.
+    </p>
+    
+    <div style="text-align: center;">
+      <button class="btn btn-primary sim-btn" id="btn-sim-grupos">
+        ⚽ Simular Usuarios y Predicciones
+      </button>
+      <button class="btn btn-danger sim-btn" id="btn-limpiar">
+        🗑️ Borrar Simulaciones
+      </button>
+    </div>
+    
+    <div id="stats-container" style="display: none;">
+      <h3 style="margin-top: 20px; color: var(--accent);">📊 Estadísticas Generadas</h3>
+      <div class="stats" id="stats-grid"></div>
+    </div>
+    
+    <div id="log" class="log" style="display: none;"></div>
+  </div>
+
+  <script type="module">
+    import { db } from './js/firebase-config.js';
+    import { collection, doc, setDoc, writeBatch, getDocs, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { generarPartidosGrupos } from './js/data.js';
+    
+    const logEl = document.getElementById('log');
+    const statsContainer = document.getElementById('stats-container');
+    const statsGrid = document.getElementById('stats-grid');
+    
+    function log(msg, type = 'info') {
+      logEl.style.display = 'block';
+      const colorClass = type === 'error' ? 'error' : type === 'warning' ? 'warning' : type === 'success' ? 'success' : 'info';
+      logEl.innerHTML += `<div class="${colorClass}">> ${msg}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    function showStats(stats) {
+      statsContainer.style.display = 'block';
+      statsGrid.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-value">${stats.usuarios}</div>
+          <div class="stat-label">Usuarios Creados</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.predicciones}</div>
+          <div class="stat-label">Predicciones Totales</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.partidosPorUsuario}</div>
+          <div class="stat-label">Predicciones / Usuario</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.tiempo}s</div>
+          <div class="stat-label">Tiempo de Ejecución</div>
+        </div>
+      `;
+    }
+    
+    // 5 escenarios
+    const ESCENARIOS = [
+      { cedula: 'SIM001', alias: 'Random', tipo: 'random', color: '🎲' },
+      { cedula: 'SIM002', alias: 'Local', tipo: 'local', color: '🏠' },
+      { cedula: 'SIM003', alias: 'Visitante', tipo: 'visitante', color: '✈️' },
+      { cedula: 'SIM004', alias: 'Empate', tipo: 'empate', color: '🤝' },
+      { cedula: 'SIM005', alias: 'Goleador', tipo: 'goleador', color: '⚽' }
+    ];
+    
+    function generarResultado(tipo) {
+      let g1, g2;
+      
+      switch(tipo) {
+        case 'random':
+          g1 = Math.floor(Math.random() * 5); // 0-4
+          g2 = Math.floor(Math.random() * 5);
+          break;
+        case 'local':
+          if (Math.random() < 0.2) { // 20% empate
+            g1 = g2 = Math.floor(Math.random() * 3);
+          } else {
+            g1 = Math.floor(Math.random() * 3) + 1; // 1-3
+            g2 = Math.floor(Math.random() * g1);
+          }
+          break;
+        case 'visitante':
+          if (Math.random() < 0.2) { // 20% empate
+            g1 = g2 = Math.floor(Math.random() * 3);
+          } else {
+            g2 = Math.floor(Math.random() * 3) + 1; // 1-3
+            g1 = Math.floor(Math.random() * g2);
+          }
+          break;
+        case 'empate':
+          if (Math.random() < 0.6) { // 60% empate
+            g1 = g2 = Math.floor(Math.random() * 3); // 0-2
+          } else {
+            g1 = Math.floor(Math.random() * 3);
+            g2 = Math.floor(Math.random() * 3);
+          }
+          break;
+        case 'goleador':
+          g1 = Math.floor(Math.random() * 4) + 2; // 2-5
+          g2 = Math.floor(Math.random() * 3); // 0-2
+          if (g1 === g2) g1++; // Nunca empate
+          break;
+      }
+      
+      return { g1, g2 };
+    }
+    
+    async function simularUsuarios() {
+      const startTime = Date.now();
+      logEl.innerHTML = '';
+      statsContainer.style.display = 'none';
+      
+      log('🚀 Iniciando simulación de fase de grupos...', 'warning');
+      log(`⏱️ ${new Date().toLocaleString()}`, 'info');
+      log('', 'info');
+      
+      let totalPredicciones = 0;
+      
+      try {
+        const partidosGrupos = generarPartidosGrupos();
+        log(`📋 Generados ${partidosGrupos.length} partidos de fase de grupos`, 'info');
+        log('', 'info');
+        
+        for (const esc of ESCENARIOS) {
+          log(`${esc.color} === USUARIO: ${esc.alias} (${esc.cedula}) ===`, 'warning');
+          
+          // 1. Crear usuario
+          const userId = `${esc.cedula}_${esc.alias}`;
+          await setDoc(doc(db, 'users', userId), {
+            cedula: esc.cedula,
+            alias: esc.alias,
+            puntos_fase_grupos: 0,
+            puntos_fase_final: 0,
+            puntos_total: 0,
+            creado: new Date().toISOString(),
+            simulado: true
+          });
+          log(`   ✓ Usuario creado en Firestore`, 'success');
+          
+          // 2. Generar predicciones de grupos (72 partidos)
+          // Usamos batches de 500 operaciones máximo (límite de Firestore)
+          const BATCH_SIZE = 450;
+          let batch = writeBatch(db);
+          let batchCount = 0;
+          let countGrupos = 0;
+          
+          for (const p of partidosGrupos) {
+            const { g1, g2 } = generarResultado(esc.tipo);
+            const docId = `${userId}_${p.id}`;
+            
+            batch.set(doc(db, 'predicciones_grupos', docId), {
+              user_id: userId,
+              partido_id: p.id,
+              prediccion_equipo1: g1,
+              prediccion_equipo2: g2,
+              actualizado: new Date().toISOString()
+            });
+            
+            batchCount++;
+            countGrupos++;
+            totalPredicciones++;
+            
+            // Commit cada 450 operaciones para no exceder límite de Firestore
+            if (batchCount >= BATCH_SIZE) {
+              await batch.commit();
+              log(`   ✓ Batch de ${batchCount} predicciones guardado`, 'success');
+              batch = writeBatch(db);
+              batchCount = 0;
+            }
+          }
+          
+          // Commit final del batch
+          if (batchCount > 0) {
+            await batch.commit();
+            log(`   ✓ Batch final de ${batchCount} predicciones guardado`, 'success');
+          }
+          
+          log(`   ✓ Total: ${countGrupos} predicciones de grupos`, 'success');
+          log('', 'info');
+        }
+        
+        const endTime = Date.now();
+        const tiempoTotal = ((endTime - startTime) / 1000).toFixed(2);
+        
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+        log('✅ SIMULACIÓN COMPLETADA EXITOSAMENTE', 'success');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+        log(`📊 Resumen:`, 'info');
+        log(`   • ${ESCENARIOS.length} usuarios creados`, 'success');
+        log(`   • ${totalPredicciones} predicciones guardadas`, 'success');
+        log(`   • ${partidosGrupos.length} predicciones por usuario`, 'success');
+        log(`   • Tiempo: ${tiempoTotal} segundos`, 'info');
+        log('', 'info');
+        log('🔍 Los usuarios simulados aparecerán en:', 'warning');
+        log('   • Ranking (ranking.html)', 'info');
+        log('   • Búsqueda de admin (admin.html)', 'info');
+        log('   • Con cédulas: SIM001, SIM002, SIM003, SIM004, SIM005', 'info');
+        log('', 'info');
+        log('💡 Próximo paso: Ve al panel admin e ingresa resultados reales', 'warning');
+        log('   para probar el recálculo de puntajes.', 'warning');
+        
+        showStats({
+          usuarios: ESCENARIOS.length,
+          predicciones: totalPredicciones,
+          partidosPorUsuario: partidosGrupos.length,
+          tiempo: tiempoTotal
+        });
+        
+      } catch (err) {
+        log('', 'info');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'error');
+        log('❌ ERROR EN LA SIMULACIÓN', 'error');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'error');
+        log(`Error: ${err.message}`, 'error');
+        log(`Stack: ${err.stack}`, 'error');
+        console.error(err);
+      }
+    }
+    
+    async function limpiarSimulaciones() {
+      logEl.innerHTML = '';
+      statsContainer.style.display = 'none';
+      log('🗑️ Iniciando limpieza de simulaciones...', 'warning');
+      
+      let usuariosEliminados = 0;
+      let prediccionesEliminadas = 0;
+      
+      try {
+        for (const esc of ESCENARIOS) {
+          const userId = `${esc.cedula}_${esc.alias}`;
+          log(`  Buscando datos de ${esc.alias}...`, 'info');
+          
+          // Borrar predicciones de grupos
+          const qGrupos = query(collection(db, 'predicciones_grupos'), where('user_id', '==', userId));
+          const snapGrupos = await getDocs(qGrupos);
+          log(`    - ${snapGrupos.size} predicciones de grupos encontradas`, 'info');
+          
+          for (const d of snapGrupos.docs) {
+            await deleteDoc(doc(db, 'predicciones_grupos', d.id));
+            prediccionesEliminadas++;
+          }
+          
+          // Borrar predicciones de final (por si acaso)
+          const qFinal = query(collection(db, 'predicciones_final'), where('user_id', '==', userId));
+          const snapFinal = await getDocs(qFinal);
+          log(`    - ${snapFinal.size} predicciones de final encontradas`, 'info');
+          
+          for (const d of snapFinal.docs) {
+            await deleteDoc(doc(db, 'predicciones_final', d.id));
+            prediccionesEliminadas++;
+          }
+          
+          // Borrar usuario
+          await deleteDoc(doc(db, 'users', userId));
+          usuariosEliminados++;
+          log(`  ✓ ${esc.alias} eliminado completamente`, 'success');
+        }
+        
+        log('', 'info');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'success');
+        log('✅ LIMPIEZA COMPLETADA', 'success');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'success');
+        log(`📊 Resumen:`, 'info');
+        log(`   • ${usuariosEliminados} usuarios eliminados`, 'success');
+        log(`   • ${prediccionesEliminadas} predicciones eliminadas`, 'success');
+        
+      } catch (err) {
+        log('', 'info');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'error');
+        log('❌ ERROR AL LIMPIAR', 'error');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'error');
+        log(`Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+    
+    document.getElementById('btn-sim-grupos').addEventListener('click', simularUsuarios);
+    document.getElementById('btn-limpiar').addEventListener('click', limpiarSimulaciones);
+    
+    log('🧪 Simulador listo. Presiona "Simular" para comenzar.', 'info');
+  </script>
+</body>
+</html>
