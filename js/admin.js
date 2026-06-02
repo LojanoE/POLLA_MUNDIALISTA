@@ -1,7 +1,7 @@
 /* admin.js - Panel de Administración */
 
 import { db } from './firebase-config.js';
-import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js';
 import { BANDERAS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo, GRUPOS } from './data.js';
 
