@@ -1000,4 +1000,155 @@ async function init() {
   await cargarPartidosFinal();
 }
 
+// ===== EVENT LISTENERS PARA BOTONES DE INICIALIZACIÓN =====
+document.getElementById('btn-init-db').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-init-db');
+  const status = document.getElementById('init-status');
+  btn.disabled = true;
+  status.textContent = 'Verificando...';
+  
+  try {
+    const existing = await getDocs(collection(db, 'partidos_grupos'));
+    if (!existing.empty) {
+      showModal({
+        icon: '⚠️',
+        title: 'Ya existen datos',
+        message: 'La base de datos ya tiene partidos cargados. Si quieres reiniciar, usa el botón rojo "Reiniciar Todo" primero.',
+        btnPrimaryText: 'Entendido',
+        btnPrimaryClass: 'btn btn-primary'
+      });
+      btn.disabled = false;
+      status.textContent = '';
+      return;
+    }
+    
+    const batch = writeBatch(db);
+    
+    const partidosGrupos = generarPartidosGrupos();
+    for (const p of partidosGrupos) {
+      const ref = doc(db, 'partidos_grupos', p.id);
+      batch.set(ref, {
+        grupo: p.grupo,
+        equipo1: p.equipo1,
+        equipo2: p.equipo2,
+        goles_equipo1: null,
+        goles_equipo2: null,
+        jugado: false,
+        fecha: p.fecha
+      });
+    }
+    
+    const partidosFinal = generarPartidosFinal();
+    for (const p of partidosFinal) {
+      const ref = doc(db, 'partidos_final', p.id);
+      const data = {
+        ronda: p.ronda,
+        numero: p.numero,
+        equipo1: p.equipo1,
+        equipo2: p.equipo2,
+        goles_equipo1: null,
+        goles_equipo2: null,
+        penales_equipo1: null,
+        penales_equipo2: null,
+        jugada: false,
+        ganador: null
+      };
+      if (p.source_equipo1 !== undefined) data.source_equipo1 = p.source_equipo1;
+      if (p.source_equipo2 !== undefined) data.source_equipo2 = p.source_equipo2;
+      if (p.perdedor_source1 !== undefined) data.perdedor_source1 = p.perdedor_source1;
+      if (p.perdedor_source2 !== undefined) data.perdedor_source2 = p.perdedor_source2;
+      batch.set(ref, data);
+    }
+    
+    const configRef = doc(db, 'config', 'app_config');
+    batch.set(configRef, {
+      fase_actual: 'grupos',
+      fase_final_habilitada: false,
+      creado: new Date().toISOString()
+    });
+    
+    await batch.commit();
+    
+    showModal({
+      icon: '✅',
+      title: '¡Base de Datos Inicializada!',
+      message: `Se cargaron:<br><br>• <b>${partidosGrupos.length}</b> partidos de grupos<br>• <b>${partidosFinal.length}</b> partidos de fase final<br><br>Ahora puedes ingresar los resultados de los partidos.`,
+      btnPrimaryText: 'Continuar',
+      btnPrimaryClass: 'btn btn-success'
+    });
+    
+    status.innerHTML = '<span style="color: #4caf50;">✅ Base de datos lista.</span>';
+    await cargarPartidosGrupos();
+    await cargarPartidosFinal();
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'Error al inicializar: ' + err.message, 'error');
+    status.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btn-reset-db').addEventListener('click', async () => {
+  showModal({
+    icon: '⚠️',
+    title: '¿Reiniciar Todo?',
+    message: 'Se eliminarán permanentemente:<br><br>• Todos los partidos (grupos y final)<br>• Todas las predicciones de usuarios<br>• Todos los puntos<br><br>⚠️ Los usuarios NO se eliminarán.<br><br>Esta acción NO se puede deshacer.',
+    btnPrimaryText: '🗑️ Sí, Reiniciar Todo',
+    btnPrimaryClass: 'btn btn-danger',
+    btnSecondaryText: 'Cancelar',
+    btnSecondaryClass: 'btn btn-secondary',
+    onPrimary: async () => {
+      const btn = document.getElementById('btn-reset-db');
+      btn.disabled = true;
+      const status = document.getElementById('init-status');
+      status.textContent = 'Eliminando datos...';
+      
+      try {
+        const batch = writeBatch(db);
+        
+        const gruposSnap = await getDocs(collection(db, 'partidos_grupos'));
+        for (const d of gruposSnap.docs) {
+          batch.delete(doc(db, 'partidos_grupos', d.id));
+        }
+        
+        const finalSnap = await getDocs(collection(db, 'partidos_final'));
+        for (const d of finalSnap.docs) {
+          batch.delete(doc(db, 'partidos_final', d.id));
+        }
+        
+        const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
+        for (const d of predsGruposSnap.docs) {
+          batch.delete(doc(db, 'predicciones_grupos', d.id));
+        }
+        
+        const predsFinalSnap = await getDocs(collection(db, 'predicciones_final'));
+        for (const d of predsFinalSnap.docs) {
+          batch.delete(doc(db, 'predicciones_final', d.id));
+        }
+        
+        await batch.commit();
+        
+        showModal({
+          icon: '✅',
+          title: '¡Reinicio Completado!',
+          message: 'Todos los partidos, predicciones y resultados han sido eliminados.<br><br>Ahora puedes volver a cargar los partidos.',
+          btnPrimaryText: 'Continuar',
+          btnPrimaryClass: 'btn btn-success'
+        });
+        
+        status.innerHTML = '<span style="color: var(--accent);">✅ Reinicio completado. Carga los partidos de nuevo.</span>';
+        
+      } catch (err) {
+        console.error(err);
+        showToast('Error', 'Error al reiniciar: ' + err.message, 'error');
+        status.textContent = '';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  });
+});
+
 init();
