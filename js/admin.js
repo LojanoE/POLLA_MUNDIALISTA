@@ -103,6 +103,78 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+// ===== GESTIÓN DE INSTITUCIONES =====
+async function cargarInstitucionesAdmin() {
+  try {
+    const snapshot = await getDocs(collection(db, 'instituciones'));
+    const list = document.getElementById('instituciones-list');
+    if (!list) return;
+    
+    if (snapshot.empty) {
+      list.innerHTML = '<p style="color:var(--text-muted); font-size:0.9rem;">No hay instituciones registradas</p>';
+      return;
+    }
+    
+    let html = '<table class="ranking-table" style="width:100%;"><thead><tr><th>Nombre</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+    snapshot.forEach(d => {
+      const data = d.data();
+      const activo = data.activo !== false;
+      html += `
+        <tr>
+          <td><strong>${d.id}</strong></td>
+          <td>${data.descripcion || '-'}</td>
+          <td><span style="color:${activo ? '#4caf50' : 'var(--danger)'};">${activo ? '✓ Activa' : '✗ Inactiva'}</span></td>
+          <td>
+            <button class="btn btn-danger" style="padding:4px 10px; font-size:0.75rem;" 
+              onclick="window.toggleInstitucion('${d.id}', ${!activo})">${activo ? 'Desactivar' : 'Activar'}</button>
+          </td>
+        </tr>
+      `;
+    });
+    html += '</tbody></table>';
+    list.innerHTML = html;
+  } catch (err) {
+    console.error('Error cargando instituciones:', err);
+  }
+}
+
+window.toggleInstitucion = async (id, activar) => {
+  try {
+    await setDoc(doc(db, 'instituciones', id), { activo: activar }, { merge: true });
+    showToast('Éxito', `Institución ${id} ${activar ? 'activada' : 'desactivada'}`, 'success');
+    await cargarInstitucionesAdmin();
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo actualizar la institución', 'error');
+  }
+};
+
+document.getElementById('btn-add-inst').addEventListener('click', async () => {
+  const nombre = document.getElementById('inst-nombre').value.trim().toUpperCase();
+  const descripcion = document.getElementById('inst-descripcion').value.trim();
+  
+  if (!nombre) {
+    showToast('Aviso', 'Ingresa un nombre para la institución', 'warning');
+    return;
+  }
+  
+  try {
+    await setDoc(doc(db, 'instituciones', nombre), {
+      nombre: nombre,
+      descripcion: descripcion || '',
+      activo: true,
+      creado: new Date().toISOString()
+    });
+    showToast('Éxito', `Institución ${nombre} agregada`, 'success');
+    document.getElementById('inst-nombre').value = '';
+    document.getElementById('inst-descripcion').value = '';
+    await cargarInstitucionesAdmin();
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo agregar la institución', 'error');
+  }
+});
+
 // ===== VERIFICACIÓN Y CARGA =====
 async function checkFaseFinalHabilitada() {
   const configRef = doc(db, 'config', 'app_config');
@@ -309,13 +381,17 @@ async function recalcularTodosLosPuntos() {
       if (data.jugado) partidosGrupos[d.id] = data;
     });
     
-    // 3. Obtener predicciones de grupos
+    // 3. Obtener predicciones de grupos (filtradas por institución activa del usuario)
     const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
     const predsGrupos = {};
     predsGruposSnap.forEach(d => {
       const data = d.data();
-      if (!predsGrupos[data.user_id]) predsGrupos[data.user_id] = {};
-      predsGrupos[data.user_id][data.partido_id] = data;
+      // Solo incluir si la institución de la predicción coincide con la institución activa del usuario
+      const user = usuarios.find(u => u.id === data.user_id);
+      if (user && data.institucion === user.institucion_activa) {
+        if (!predsGrupos[data.user_id]) predsGrupos[data.user_id] = {};
+        predsGrupos[data.user_id][data.partido_id] = data;
+      }
     });
     
     // 4. Calcular puntos de fase de grupos
@@ -355,8 +431,12 @@ async function recalcularTodosLosPuntos() {
     const predsFinal = {};
     predsFinalSnap.forEach(d => {
       const data = d.data();
-      if (!predsFinal[data.user_id]) predsFinal[data.user_id] = {};
-      predsFinal[data.user_id][data.partido_id] = data;
+      // Solo incluir si la institución de la predicción coincide con la institución activa del usuario
+      const user = usuarios.find(u => u.id === data.user_id);
+      if (user && data.institucion === user.institucion_activa) {
+        if (!predsFinal[data.user_id]) predsFinal[data.user_id] = {};
+        predsFinal[data.user_id][data.partido_id] = data;
+      }
     });
     
     const getGanadorReal = (partido) => {
@@ -719,7 +799,10 @@ function renderizarRondaActual() {
       <div class="admin-match-input ${validationClass}" data-id="${p.id}" data-ronda="${ronda}">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <small style="color:var(--text-muted);">${p.id} — Ronda #${p.numero}</small>
-          ${yaJugado ? '<span style="color:#4caf50; font-size:0.8rem;">✓ Jugado</span>' : '<span style="color:var(--text-muted); font-size:0.8rem;">Pendiente</span>'}
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.85rem; color:var(--text-muted);">
+            <input type="checkbox" data-field="jugado" data-id="${p.id}" ${yaJugado ? 'checked' : ''}>
+            <span style="color:${yaJugado ? '#4caf50' : 'inherit'};">${yaJugado ? '✓ Jugado' : 'Marcar como jugado'}</span>
+          </label>
         </div>
         <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
           <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px;">
@@ -769,14 +852,25 @@ function renderizarRondaActual() {
 function handleInputChange(e) {
   const id = e.target.dataset.id;
   const field = e.target.dataset.field;
-  const value = e.target.value;
   
   if (!resultadosFinal[id]) resultadosFinal[id] = {};
-  resultadosFinal[id][field] = value;
   
-  if (field === 'g1' || field === 'g2') {
-    resultadosFinal[id].jugado = false;
+  if (field === 'jugado') {
+    resultadosFinal[id].jugado = e.target.checked;
+    // Actualizar visual del checkbox label
+    const label = e.target.closest('label');
+    if (label) {
+      const span = label.querySelector('span');
+      if (span) {
+        span.textContent = e.target.checked ? '✓ Jugado' : 'Marcar como jugado';
+        span.style.color = e.target.checked ? '#4caf50' : 'inherit';
+      }
+    }
+    return;
   }
+  
+  const value = e.target.value;
+  resultadosFinal[id][field] = value;
   
   // Actualizar visualización de la card
   actualizarCardVisual(id);
@@ -1031,18 +1125,14 @@ async function guardarRondaActual() {
       const updateData = {
         goles_equipo1: g1,
         goles_equipo2: g2,
-        jugado: true,
-        ganador: ganador
+        ganador: ganador,
+        jugado: resultadosFinal[p.id]?.jugado || false
       };
       
       if (p1 !== null) updateData.penales_equipo1 = p1;
       if (p2 !== null) updateData.penales_equipo2 = p2;
       
       batch.update(ref, updateData);
-      
-      // Marcar como jugado en local
-      resultadosFinal[p.id].jugado = true;
-      
       count++;
     }
     
@@ -1271,6 +1361,7 @@ document.getElementById('btn-generar-fase-final').addEventListener('click', asyn
 // ===== INICIALIZACIÓN =====
 async function init() {
   await checkFaseFinalHabilitada();
+  await cargarInstitucionesAdmin();
   await cargarPartidosGrupos();
   await cargarPartidosFinal();
 }
@@ -1339,6 +1430,20 @@ document.getElementById('btn-init-db').addEventListener('click', async () => {
     batch.set(configRef, {
       fase_actual: 'grupos',
       fase_final_habilitada: false,
+      creado: new Date().toISOString()
+    });
+    
+    // Seed default institutions
+    batch.set(doc(db, 'instituciones', 'GDR'), {
+      nombre: 'GDR',
+      descripcion: 'Gerencia de Desarrollo y Recursos',
+      activo: true,
+      creado: new Date().toISOString()
+    });
+    batch.set(doc(db, 'instituciones', 'MANTENIMIENTO'), {
+      nombre: 'MANTENIMIENTO',
+      descripcion: 'Mantenimiento',
+      activo: true,
       creado: new Date().toISOString()
     });
     
@@ -1596,9 +1701,25 @@ window.borrarPrediccion = async (cedula, alias, partidoId, tipo) => {
   if (!confirm(`¿Eliminar predicción de ${alias} para el partido ${partidoId}?`)) return;
   
   try {
-    const docId = `${cedula}_${alias}_${partidoId}`;
+    const userId = `${cedula}_${alias}`;
     const coleccion = tipo === 'grupos' ? 'predicciones_grupos' : 'predicciones_final';
-    await deleteDoc(doc(db, coleccion, docId));
+    
+    // Buscar el documento por user_id y partido_id (el docId ahora incluye institución)
+    const qPred = query(
+      collection(db, coleccion),
+      where('user_id', '==', userId),
+      where('partido_id', '==', partidoId)
+    );
+    const snap = await getDocs(qPred);
+    
+    if (snap.empty) {
+      showToast('Aviso', 'No se encontró la predicción', 'warning');
+      return;
+    }
+    
+    for (const d of snap.docs) {
+      await deleteDoc(doc(db, coleccion, d.id));
+    }
     
     showToast('Éxito', 'Predicción eliminada', 'success');
     window.verPrediccionesUsuario(cedula, alias);

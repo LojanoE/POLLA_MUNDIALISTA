@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inicializar Base de Datos - Polla Mundialista</title>
-  <link rel="stylesheet" href="css/styles.css?v=3.0">
+  <link rel="stylesheet" href="css/styles.css?v=5.0">
 </head>
 <body>
 
@@ -43,7 +43,7 @@
   <script type="module">
     import { db } from './js/firebase-config.js';
     import { collection, getDocs, writeBatch, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { generarPartidosGrupos, generarPartidosFinal } from './js/data.js';
+    import { generarPartidosGrupos, generarPartidosFinal, generarInstitucionesPorDefecto } from './js/data.js';
     
     const alertBox = document.getElementById('alert-box');
     const status = document.getElementById('init-status');
@@ -108,7 +108,14 @@
           batch.set(ref, data);
         }
         
-        // 3. Crear documento de config
+        // 3. Crear instituciones por defecto
+        const instituciones = generarInstitucionesPorDefecto();
+        for (const inst of instituciones) {
+          const ref = doc(db, 'instituciones', inst.codigo);
+          batch.set(ref, inst);
+        }
+        
+        // 4. Crear documento de config
         const configRef = doc(db, 'config', 'app_config');
         batch.set(configRef, {
           fase_actual: 'grupos',
@@ -118,7 +125,7 @@
         
         await batch.commit();
         
-        showAlert(`✅ Base de datos inicializada:\n• ${partidosGrupos.length} partidos de grupos\n• ${partidosFinal.length} partidos de fase final`, 'success');
+        showAlert(`✅ Base de datos inicializada:\n• ${partidosGrupos.length} partidos de grupos\n• ${partidosFinal.length} partidos de fase final\n• ${instituciones.length} instituciones`, 'success');
         status.textContent = 'Inicialización completada con éxito.';
         
       } catch (err) {

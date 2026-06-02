@@ -67,6 +67,14 @@ export const BANDERAS = {
   "Panamá": "pa"
 };
 
+// Instituciones por defecto
+export function generarInstitucionesPorDefecto() {
+  return [
+    { codigo: 'GDR', nombre: 'GDR' },
+    { codigo: 'MANTENIMIENTO', nombre: 'Mantenimiento' }
+  ];
+}
+
 // Genera los 6 partidos de cada grupo
 export function generarPartidosGrupos() {
   const partidos = [];

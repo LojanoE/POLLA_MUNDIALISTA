@@ -1,8 +1,8 @@
-/* grupos.js - Fase de Grupos: carga partidos y guarda predicciones */
+/* grupos.js - Fase de Grupos: carga partidos y guarda predicciones por institución */
 
 import { db } from './firebase-config.js';
-import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser } from './auth.js';
+import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js';
 import { GRUPOS, BANDERAS } from './data.js';
 
 // Verificar sesión
@@ -11,6 +11,20 @@ if (!user) throw new Error("No autenticado");
 
 updateNav();
 document.getElementById('nav-logout').addEventListener('click', logout);
+
+// Mostrar institución activa
+function mostrarInstitucion() {
+  const institucion = getInstitucionActiva();
+  if (institucion) {
+    const badge = document.getElementById('institucion-badge');
+    const nombre = document.getElementById('institucion-nombre');
+    if (badge && nombre) {
+      nombre.textContent = institucion;
+      badge.style.display = 'inline-block';
+    }
+  }
+}
+mostrarInstitucion();
 
 // Mostrar alertas
 function showAlert(msg, type) {
@@ -29,7 +43,7 @@ function getFlagUrl(pais) {
 // Estado local
 let partidosData = [];
 let prediccionesLocales = {};
-let prediccionesGuardadasIds = new Set(); // IDs de partidos ya guardados en Firestore
+let prediccionesGuardadasIds = new Set();
 
 // Cargar partidos desde Firestore
 async function cargarPartidos() {
@@ -92,7 +106,8 @@ function renderizarGrupos() {
       
       const jugado = partido.jugado;
       const yaGuardado = prediccionesGuardadasIds.has(partido.id);
-      const bloqueado = jugado || yaGuardado;
+      // Solo bloquear si el partido YA SE JUGÓ (no si solo está guardado)
+      const bloqueado = jugado;
       const disabled = bloqueado ? 'disabled' : '';
       
       if (!bloqueado) tienePartidosEditables = true;
@@ -149,9 +164,9 @@ function renderizarGrupos() {
   const btnSave = document.getElementById('btn-save');
   if (!tienePartidosEditables) {
     btnSave.disabled = true;
-    btnSave.textContent = '✓ Todas las predicciones guardadas';
+    btnSave.textContent = '✓ Partidos cerrados (ya jugados)';
     btnSave.style.opacity = '0.6';
-    document.getElementById('save-status').textContent = 'Ya guardaste todas tus predicciones. Espera los resultados oficiales.';
+    document.getElementById('save-status').textContent = 'Los partidos de esta fase ya se jugaron. No se pueden editar predicciones.';
   } else {
     btnSave.disabled = false;
     btnSave.textContent = '💾 Guardar Predicciones';
@@ -160,22 +175,31 @@ function renderizarGrupos() {
   }
 }
 
-// Cargar predicciones del usuario desde Firestore
+// Cargar predicciones del usuario desde Firestore (filtradas por institución)
 async function cargarPrediccionesUsuario() {
   try {
     const user = getCurrentUser();
-    const q = query(collection(db, 'predicciones_grupos'));
+    const institucion = getInstitucionActiva();
+    
+    if (!institucion) {
+      console.warn('No hay institución activa');
+      return;
+    }
+    
+    const q = query(
+      collection(db, 'predicciones_grupos'),
+      where('user_id', '==', `${user.cedula}_${user.alias}`),
+      where('institucion', '==', institucion)
+    );
     const snapshot = await getDocs(q);
     
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.user_id === `${user.cedula}_${user.alias}`) {
-        prediccionesGuardadasIds.add(data.partido_id);
-        prediccionesLocales[data.partido_id] = {
-          e1: data.prediccion_equipo1 ?? '',
-          e2: data.prediccion_equipo2 ?? ''
-        };
-      }
+      prediccionesGuardadasIds.add(data.partido_id);
+      prediccionesLocales[data.partido_id] = {
+        e1: data.prediccion_equipo1 ?? '',
+        e2: data.prediccion_equipo2 ?? ''
+      };
     });
     
   } catch (err) {
@@ -188,6 +212,12 @@ async function guardarPredicciones() {
   const btn = document.getElementById('btn-save');
   const status = document.getElementById('save-status');
   const user = getCurrentUser();
+  const institucion = getInstitucionActiva();
+  
+  if (!institucion) {
+    showAlert('Error: No hay institución seleccionada', 'danger');
+    return;
+  }
   
   btn.disabled = true;
   status.textContent = 'Guardando...';
@@ -197,19 +227,18 @@ async function guardarPredicciones() {
     let countGuardados = 0;
     
     for (const [partidoId, preds] of Object.entries(prediccionesLocales)) {
-      // Saltar si ya estaba guardado
-      if (prediccionesGuardadasIds.has(partidoId)) continue;
-      
       const e1 = preds.e1 !== '' ? parseInt(preds.e1) : null;
       const e2 = preds.e2 !== '' ? parseInt(preds.e2) : null;
       
       if (e1 === null || e2 === null) continue;
       
-      const docId = `${user.cedula}_${user.alias}_${partidoId}`;
+      // DocID incluye institución: cedula_alias_institucion_partidoId
+      const docId = `${user.cedula}_${user.alias}_${institucion}_${partidoId}`;
       const ref = doc(db, 'predicciones_grupos', docId);
       
       batch.set(ref, {
         user_id: `${user.cedula}_${user.alias}`,
+        institucion: institucion,
         partido_id: partidoId,
         prediccion_equipo1: e1,
         prediccion_equipo2: e2,
@@ -231,7 +260,7 @@ async function guardarPredicciones() {
     showAlert(`¡${countGuardados} predicciones guardadas correctamente!`, 'success');
     status.textContent = 'Guardado el ' + new Date().toLocaleString();
     
-    // Re-renderizar para bloquear inputs
+    // Re-renderizar para mostrar badges
     renderizarGrupos();
     
   } catch (err) {

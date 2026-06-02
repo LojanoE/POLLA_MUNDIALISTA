@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel Admin - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=4.0">
+  <link rel="stylesheet" href="css/styles.css?v=5.0">
   <style>
     .toast-container {
       position: fixed;
@@ -406,6 +406,20 @@
       </div>
     </div>
     
+    <!-- Gestión de Instituciones -->
+    <div class="admin-section">
+      <h3>🏢 Gestión de Instituciones</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+        Administra las instituciones participantes. Solo las instituciones activas aparecen en el login.
+      </p>
+      <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+        <input type="text" id="inst-nombre" placeholder="Nombre de la institución (ej: GDR)" style="padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); flex: 2; min-width: 200px;">
+        <input type="text" id="inst-descripcion" placeholder="Descripción (opcional)" style="padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); flex: 2; min-width: 200px;">
+        <button id="btn-add-inst" class="btn btn-success" style="padding: 10px 20px;">➕ Agregar</button>
+      </div>
+      <div id="instituciones-list" style="margin-top: 10px;"></div>
+    </div>
+    
     <!-- Generar Fase Final Automáticamente -->
     <div class="admin-section">
       <h3>⚙️ Generar Fase Final</h3>
@@ -525,6 +539,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/admin.js?v=4.0"></script>
+  <script type="module" src="js/admin.js?v=5.0"></script>
 </body>
 </html>

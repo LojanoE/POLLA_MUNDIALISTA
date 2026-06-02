@@ -401,6 +401,20 @@ body {
 .alert-danger { background: rgba(244, 67, 54, 0.2); border: 1px solid var(--danger); color: var(--danger); }
 .alert-info { background: rgba(33, 150, 243, 0.2); border: 1px solid var(--info); color: var(--info); }
 
+/* Institution Badge */
+.institucion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(168, 213, 186, 0.2);
+  border: 1px solid var(--accent);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: bold;
+}
+
 /* Toggle Switch */
 .toggle-container {
   display: flex;

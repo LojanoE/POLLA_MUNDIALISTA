@@ -1,8 +1,8 @@
 /* final.js - Fase Final: Sistema de pasos tipo cuestionario */
 
 import { db } from './firebase-config.js';
-import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser } from './auth.js';
+import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js';
 import { BANDERAS } from './data.js';
 
 const user = requireAuth();
@@ -10,6 +10,20 @@ if (!user) throw new Error("No autenticado");
 
 updateNav();
 document.getElementById('nav-logout').addEventListener('click', logout);
+
+// Mostrar institución activa
+function mostrarInstitucion() {
+  const institucion = getInstitucionActiva();
+  if (institucion) {
+    const badge = document.getElementById('institucion-badge');
+    const nombre = document.getElementById('institucion-nombre');
+    if (badge && nombre) {
+      nombre.textContent = institucion;
+      badge.style.display = 'inline-block';
+    }
+  }
+}
+mostrarInstitucion();
 
 // ===== CONFIGURACIÓN =====
 const RONDAS = ['dieciseisavos', 'octavos', 'cuartos', 'semis', 'tercer_lugar', 'final'];
@@ -109,21 +123,30 @@ async function cargarPartidosFinal() {
 async function cargarPrediccionesUsuario() {
   try {
     const currentUser = getCurrentUser();
-    const q = query(collection(db, 'predicciones_final'));
+    const institucion = getInstitucionActiva();
+    
+    if (!institucion) {
+      console.warn('No hay institución activa');
+      return;
+    }
+    
+    const q = query(
+      collection(db, 'predicciones_final'),
+      where('user_id', '==', `${currentUser.cedula}_${currentUser.alias}`),
+      where('institucion', '==', institucion)
+    );
     const snapshot = await getDocs(q);
     
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.user_id === `${currentUser.cedula}_${currentUser.alias}`) {
-        prediccionesGuardadasIds.add(data.partido_id);
-        prediccionesLocales[data.partido_id] = {
-          g1: data.prediccion_equipo1 !== null ? String(data.prediccion_equipo1) : '',
-          g2: data.prediccion_equipo2 !== null ? String(data.prediccion_equipo2) : '',
-          p1: data.prediccion_penales_equipo1 !== null ? String(data.prediccion_penales_equipo1) : '',
-          p2: data.prediccion_penales_equipo2 !== null ? String(data.prediccion_penales_equipo2) : '',
-          ganador: data.prediccion_ganador || ''
-        };
-      }
+      prediccionesGuardadasIds.add(data.partido_id);
+      prediccionesLocales[data.partido_id] = {
+        g1: data.prediccion_equipo1 !== null ? String(data.prediccion_equipo1) : '',
+        g2: data.prediccion_equipo2 !== null ? String(data.prediccion_equipo2) : '',
+        p1: data.prediccion_penales_equipo1 !== null ? String(data.prediccion_penales_equipo1) : '',
+        p2: data.prediccion_penales_equipo2 !== null ? String(data.prediccion_penales_equipo2) : '',
+        ganador: data.prediccion_ganador || ''
+      };
     });
   } catch (err) {
     console.error('Error cargando predicciones:', err);
@@ -255,7 +278,9 @@ function renderizarRondaActual() {
     const eq1 = equiposCalculados[p.id]?.eq1 || p.equipo1;
     const eq2 = equiposCalculados[p.id]?.eq2 || p.equipo2;
     const yaGuardado = prediccionesGuardadasIds.has(p.id);
-    const disabled = yaGuardado ? 'disabled' : '';
+    const jugado = p.jugado;
+    // Solo bloquear si el partido YA SE JUGÓ (no si solo está guardado)
+    const disabled = jugado ? 'disabled' : '';
     const pred = prediccionesLocales[p.id] || {};
     const g1 = pred.g1 ?? '';
     const g2 = pred.g2 ?? '';
@@ -265,14 +290,17 @@ function renderizarRondaActual() {
     // Determinar si se muestran penales
     const g1Num = g1 !== '' ? parseInt(g1) : null;
     const g2Num = g2 !== '' ? parseInt(g2) : null;
-    const mostrarPenales = g1Num !== null && g2Num !== null && g1Num === g2Num && !yaGuardado;
+    const mostrarPenales = g1Num !== null && g2Num !== null && g1Num === g2Num && !jugado;
     const penalesClass = mostrarPenales ? 'visible' : '';
     
     // Determinar estado del ganador
     let winnerHtml = '';
-    if (yaGuardado) {
+    if (jugado) {
       const ganador = pred.ganador || calcularGanadorAutomatico(p.id);
-      winnerHtml = `<span class="winner-name">✅ Guardado - Avanza: ${ganador || '?'}</span>`;
+      winnerHtml = `<span class="winner-name">✅ Partido jugado - Avanza: ${ganador || '?'}</span>`;
+    } else if (yaGuardado) {
+      const ganador = pred.ganador || calcularGanadorAutomatico(p.id);
+      winnerHtml = `<span class="winner-name">✓ Guardado - Avanza: ${ganador || '?'}</span>`;
     } else if (g1Num !== null && g2Num !== null) {
       const ganador = calcularGanadorAutomatico(p.id);
       if (ganador) {
@@ -610,6 +638,13 @@ async function guardarPredicciones(bloquear = false) {
   const btnFinal = document.getElementById('btn-save-final');
   const status = document.getElementById('save-status');
   const user = getCurrentUser();
+  const institucion = getInstitucionActiva();
+  
+  if (!institucion) {
+    showAlert('Error: No hay institución seleccionada', 'danger');
+    isSaving = false;
+    return;
+  }
   
   btnProgress.disabled = true;
   if (!bloquear) btnFinal.disabled = true;
@@ -638,9 +673,11 @@ async function guardarPredicciones(bloquear = false) {
       const ganador = calcularGanadorAutomatico(partidoId);
       if (!ganador) continue;
       
-      const docId = `${user.cedula}_${user.alias}_${partidoId}`;
+      // DocID incluye institución: cedula_alias_institucion_partidoId
+      const docId = `${user.cedula}_${user.alias}_${institucion}_${partidoId}`;
       batch.set(doc(db, 'predicciones_final', docId), {
         user_id: `${user.cedula}_${user.alias}`,
+        institucion: institucion,
         partido_id: partidoId,
         prediccion_equipo1: g1,
         prediccion_equipo2: g2,

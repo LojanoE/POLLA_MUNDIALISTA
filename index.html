@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Polla Mundialista 2026 - Login</title>
-  <link rel="stylesheet" href="css/styles.css?v=3.0">
+  <link rel="stylesheet" href="css/styles.css?v=5.0">
 </head>
 <body>
 
@@ -33,6 +33,14 @@
         <div class="form-group">
           <label for="alias">Alias / Nombre</label>
           <input type="text" id="alias" placeholder="Tu nombre o apodo" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="institucion">Institución / Departamento</label>
+          <select id="institucion" class="form-control" style="width:100%; padding:10px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; color:var(--text-primary);" required>
+            <option value="">Selecciona tu institución...</option>
+          </select>
+          <small style="color:var(--text-muted); font-size:0.8rem;">Carga la base de datos para ver las instituciones disponibles</small>
         </div>
         
         <button type="submit" class="btn btn-primary btn-block" style="margin-top: 10px;">Entrar</button>
@@ -73,14 +81,40 @@
       setTimeout(() => alertBox.className = 'alert', 3000);
     }
     
+    // Cargar instituciones disponibles
+    async function cargarInstituciones() {
+      try {
+        const select = document.getElementById('institucion');
+        const snapshot = await getDocs(collection(db, 'instituciones'));
+        if (snapshot.empty) {
+          select.innerHTML = '<option value="">No hay instituciones. Inicializa la BD primero.</option>';
+          return;
+        }
+        let html = '<option value="">Selecciona tu institución...</option>';
+        snapshot.forEach(d => {
+          const data = d.data();
+          html += `<option value="${data.codigo}">${data.nombre}</option>`;
+        });
+        select.innerHTML = html;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    cargarInstituciones();
+    
     // Login usuario
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const cedula = document.getElementById('cedula').value.trim();
       const alias = document.getElementById('alias').value.trim();
+      const institucion = document.getElementById('institucion').value;
       
       if (!cedula || !alias) {
         showAlert('Ingresa cédula y alias', 'danger');
+        return;
+      }
+      if (!institucion) {
+        showAlert('Selecciona una institución', 'danger');
         return;
       }
       
@@ -90,8 +124,16 @@
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          // Usuario existente, login normal
-          setCurrentUser(cedula, alias);
+          // Usuario existente - verificar si ya está en esta institución
+          const userData = userSnap.data();
+          const instituciones = userData.instituciones || [];
+          if (!instituciones.includes(institucion)) {
+            // Agregar institución al usuario
+            await setDoc(userRef, {
+              instituciones: [...instituciones, institucion]
+            }, { merge: true });
+          }
+          setCurrentUser(cedula, alias, false, institucion);
           window.location.href = 'grupos.html';
         } else {
           // Verificar cuántos aliases tiene esta cédula
@@ -107,13 +149,14 @@
           await setDoc(userRef, {
             cedula,
             alias,
+            instituciones: [institucion],
             puntos_fase_grupos: 0,
             puntos_fase_final: 0,
             puntos_total: 0,
             creado: new Date().toISOString()
           });
           
-          setCurrentUser(cedula, alias);
+          setCurrentUser(cedula, alias, false, institucion);
           window.location.href = 'grupos.html';
         }
         

@@ -4,14 +4,35 @@ export const ADMIN_USER = "ADMIN";
 export const ADMIN_PASS = "Mirador12345";
 
 export function getCurrentUser() {
-  const user = localStorage.getItem("polla_user");
-  return user ? JSON.parse(user) : null;
+  try {
+    const user = localStorage.getItem("polla_user");
+    return user ? JSON.parse(user) : null;
+  } catch {
+    localStorage.removeItem("polla_user");
+    return null;
+  }
 }
 
-export function setCurrentUser(cedula, alias, isAdmin = false) {
+export function setCurrentUser(cedula, alias, isAdmin = false, institucion = null) {
   const user = { cedula, alias, isAdmin };
+  if (institucion) {
+    user.institucion = institucion;
+  }
   localStorage.setItem("polla_user", JSON.stringify(user));
   return user;
+}
+
+export function setInstitucionActiva(institucion) {
+  const user = getCurrentUser();
+  if (user) {
+    user.institucion = institucion;
+    localStorage.setItem("polla_user", JSON.stringify(user));
+  }
+}
+
+export function getInstitucionActiva() {
+  const user = getCurrentUser();
+  return user ? user.institucion : null;
 }
 
 export function logout() {
@@ -42,9 +63,14 @@ export function updateNav() {
   const navUser = document.getElementById("nav-user");
   const navAdmin = document.getElementById("nav-admin");
   const navLogout = document.getElementById("nav-logout");
+  const navInstitucion = document.getElementById("nav-institucion");
   
   if (navUser && user) {
-    navUser.textContent = user.isAdmin ? `Admin` : user.alias;
+    let displayText = user.isAdmin ? `Admin` : user.alias;
+    if (user.institucion && !user.isAdmin) {
+      displayText += ` (${user.institucion})`;
+    }
+    navUser.textContent = displayText;
   }
   if (navAdmin) {
     navAdmin.style.display = user && user.isAdmin ? "inline-block" : "none";

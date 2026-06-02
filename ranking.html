@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ranking - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=3.0">
+  <link rel="stylesheet" href="css/styles.css?v=5.0">
 </head>
 <body>
 
@@ -30,6 +30,17 @@
     <h2 style="color: var(--accent); text-align: center; margin-bottom: 10px;">📊 Tabla de Posiciones</h2>
     <p style="text-align: center; color: var(--text-muted); margin-bottom: 30px;">Ranking de participantes por puntos acumulados</p>
     
+    <div id="institucion-badge" class="institucion-badge" style="display:none; text-align:center; margin-bottom:15px;">
+      <span>🏢</span> <span id="institucion-nombre"></span>
+    </div>
+    
+    <!-- Tabs de instituciones (solo admin) -->
+    <div id="institucion-tabs" style="display:none; margin-bottom:20px;">
+      <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        <button class="inst-tab active" data-inst="TODAS" style="padding:8px 16px; border-radius:8px; border:2px solid var(--accent); background:rgba(168,213,186,0.2); color:var(--accent); cursor:pointer; font-weight:bold;">Todas</button>
+      </div>
+    </div>
+    
     <div id="alert-box" class="alert"></div>
     
     <div style="overflow-x: auto;">
@@ -50,6 +61,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/ranking.js?v=3.0"></script>
+  <script type="module" src="js/ranking.js?v=5.0"></script>
 </body>
 </html>
