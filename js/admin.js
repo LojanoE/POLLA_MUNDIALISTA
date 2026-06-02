@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración */
 
 import { db } from './firebase-config.js';
-import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js';
-import { BANDERAS } from './data.js';
+import { BANDERAS, generarPartidosGrupos, generarPartidosFinal } from './data.js';
 
 // Verificar admin
 const user = requireAdmin();
@@ -465,6 +465,138 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
   } finally {
     btn.disabled = false;
     btn.textContent = '🔄 Recalcular Puntajes';
+  }
+});
+
+// Inicializar Base de Datos
+document.getElementById('btn-init-db').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-init-db');
+  const status = document.getElementById('init-status');
+  btn.disabled = true;
+  status.textContent = 'Verificando...';
+  
+  try {
+    // Verificar si ya existen partidos
+    const existing = await getDocs(collection(db, 'partidos_grupos'));
+    if (!existing.empty) {
+      status.innerHTML = '<span style="color: var(--accent);">⚠️ Ya existen partidos. Si quieres reiniciar, usa el botón rojo "Reiniciar Todo".</span>';
+      btn.disabled = false;
+      return;
+    }
+    
+    const batch = writeBatch(db);
+    
+    // 1. Crear partidos de grupos
+    const partidosGrupos = generarPartidosGrupos();
+    for (const p of partidosGrupos) {
+      const ref = doc(db, 'partidos_grupos', p.id);
+      batch.set(ref, {
+        grupo: p.grupo,
+        equipo1: p.equipo1,
+        equipo2: p.equipo2,
+        goles_equipo1: null,
+        goles_equipo2: null,
+        jugado: false,
+        fecha: p.fecha
+      });
+    }
+    
+    // 2. Crear partidos de fase final
+    const partidosFinal = generarPartidosFinal();
+    for (const p of partidosFinal) {
+      const ref = doc(db, 'partidos_final', p.id);
+      batch.set(ref, {
+        ronda: p.ronda,
+        numero: p.numero,
+        equipo1: p.equipo1,
+        equipo2: p.equipo2,
+        goles_equipo1: null,
+        goles_equipo2: null,
+        penales_equipo1: null,
+        penales_equipo2: null,
+        jugado: false,
+        ganador: null
+      });
+    }
+    
+    // 3. Crear documento de config
+    const configRef = doc(db, 'config', 'app_config');
+    batch.set(configRef, {
+      fase_actual: 'grupos',
+      fase_final_habilitada: false,
+      creado: new Date().toISOString()
+    });
+    
+    await batch.commit();
+    
+    showAlert(`✅ Base de datos inicializada: ${partidosGrupos.length} partidos de grupos + ${partidosFinal.length} partidos de final`, 'success');
+    status.innerHTML = `<span style="color: #4caf50;">✅ ${partidosGrupos.length} partidos de grupos y ${partidosFinal.length} de final cargados.</span>`;
+    
+    // Recargar las listas
+    cargarPartidosGrupos();
+    cargarPartidosFinal();
+    
+  } catch (err) {
+    console.error(err);
+    showAlert('Error inicializando base de datos: ' + err.message, 'danger');
+    status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Resetear Base de Datos (borrar todo)
+document.getElementById('btn-reset-db').addEventListener('click', async () => {
+  if (!confirm('⚠️ ¿ESTÁS SEGURO?\n\nEsto borrará TODOS los partidos, resultados, predicciones y configuraciones.\n\nLos usuarios registrados NO se borrarán.\n\n¿Deseas continuar?')) {
+    return;
+  }
+  
+  const btn = document.getElementById('btn-reset-db');
+  const status = document.getElementById('init-status');
+  btn.disabled = true;
+  status.textContent = 'Borrando datos...';
+  
+  try {
+    // Borrar partidos de grupos
+    const gruposSnap = await getDocs(collection(db, 'partidos_grupos'));
+    for (const d of gruposSnap.docs) {
+      await deleteDoc(doc(db, 'partidos_grupos', d.id));
+    }
+    
+    // Borrar partidos de final
+    const finalSnap = await getDocs(collection(db, 'partidos_final'));
+    for (const d of finalSnap.docs) {
+      await deleteDoc(doc(db, 'partidos_final', d.id));
+    }
+    
+    // Borrar predicciones de grupos
+    const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
+    for (const d of predsGruposSnap.docs) {
+      await deleteDoc(doc(db, 'predicciones_grupos', d.id));
+    }
+    
+    // Borrar predicciones de final
+    const predsFinalSnap = await getDocs(collection(db, 'predicciones_final'));
+    for (const d of predsFinalSnap.docs) {
+      await deleteDoc(doc(db, 'predicciones_final', d.id));
+    }
+    
+    // Borrar config
+    await deleteDoc(doc(db, 'config', 'app_config'));
+    
+    showAlert('✅ Base de datos reiniciada. Ahora puedes cargar los partidos de nuevo.', 'success');
+    status.innerHTML = '<span style="color: #4caf50;">✅ Todo reiniciado. Presiona "🚀 Cargar Partidos" para empezar de nuevo.</span>';
+    
+    // Limpiar vistas
+    document.getElementById('admin-grupos-container').innerHTML = '';
+    document.getElementById('admin-final-container').innerHTML = '';
+    
+  } catch (err) {
+    console.error(err);
+    showAlert('Error reiniciando: ' + err.message, 'danger');
+    status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
+  } finally {
+    btn.disabled = false;
   }
 });
 

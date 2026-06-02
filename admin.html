@@ -29,6 +29,17 @@
     
     <h2 style="color: var(--accent); margin-bottom: 30px; text-align: center;">⚙️ Panel de Administrador</h2>
     
+    <!-- Inicializar Base de Datos -->
+    <div class="admin-section">
+      <h3>🗃️ Inicializar Base de Datos</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+        Carga todos los partidos de la fase de grupos y fase final en Firebase. Ejecuta esto solo una vez al inicio del torneo.
+      </p>
+      <button id="btn-init-db" class="btn btn-success" style="margin-right: 10px;">🚀 Cargar Partidos</button>
+      <button id="btn-reset-db" class="btn btn-danger">⚠️ Reiniciar Todo (Borra resultados y predicciones)</button>
+      <div id="init-status" style="margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;"></div>
+    </div>
+    
     <!-- Control de Fase Final -->
     <div class="admin-section">
       <h3>🎮 Control de Fases</h3>
