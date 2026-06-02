@@ -1,64 +1,119 @@
-/* admin.js - Panel de Administración */
+/* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
 import { db } from './firebase-config.js';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js';
-import { BANDERAS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo, GRUPOS } from './data.js';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js';
 
-// Verificar admin
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
 
 updateNav();
 document.getElementById('nav-logout').addEventListener('click', logout);
 
-function showAlert(msg, type) {
-  const box = document.getElementById('alert-box');
-  box.textContent = msg;
-  box.className = `alert alert-${type} show`;
-  setTimeout(() => box.className = 'alert', 3000);
-}
+// ===== CONFIGURACIÓN =====
+const RONDAS = ['dieciseisavos', 'octavos', 'cuartos', 'semis', 'tercer_lugar', 'final'];
+const NOMBRES_RONDAS = {
+  dieciseisavos: 'Dieciseisavos de Final',
+  octavos: 'Octavos de Final',
+  cuartos: 'Cuartos de Final',
+  semis: 'Semifinales',
+  tercer_lugar: 'Tercer Lugar',
+  final: 'La Gran Final'
+};
 
-function getFlagUrl(pais) {
-  const code = BANDERAS[pais] || 'xx';
-  return `https://flagcdn.com/w40/${code}.png`;
-}
-
+// Estado global
+let partidosGruposData = {};
+let partidosFinalData = {};
 let resultadosGrupos = {};
-let resultadosFinal = {};
+let resultadosFinal = {};           // { partidoId: { g1, g2, p1, p2, eq1, eq2, jugador } }
+let prediccionesLocales = {};       // Para validaciones
+let rondaActualIndex = 0;
+let partidosFinalPorRonda = {};
+let isSaving = false;
 
-// Cargar configuración
-async function cargarConfig() {
-  try {
-    const configRef = doc(db, 'config', 'app_config');
-    const snap = await getDoc(configRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      document.getElementById('toggle-fase-final').checked = !!data.fase_final_habilitada;
-      document.getElementById('status-fase-final').textContent = data.fase_final_habilitada ? 'Habilitada' : 'Deshabilitada';
-    } else {
-      // Crear config inicial
-      await setDoc(configRef, { fase_actual: 'grupos', fase_final_habilitada: false });
-    }
-  } catch (err) {
-    console.error(err);
+// ===== TOAST NOTIFICATIONS =====
+function showToast(title, message, type = 'info', duration = 5000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type]}</span>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      <div class="toast-message">${message}</div>
+    </div>
+  `;
+  
+  container.appendChild(toast);
+  
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.add('hiding');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+function showAlert(msg, type) {
+  showToast(type === 'danger' ? 'Error' : type === 'success' ? 'Éxito' : 'Aviso', msg, type === 'danger' ? 'error' : type);
+}
+
+// ===== MODAL SYSTEM =====
+function showModal(options) {
+  const overlay = document.getElementById('modal-overlay');
+  const icon = document.getElementById('modal-icon');
+  const title = document.getElementById('modal-title');
+  const message = document.getElementById('modal-message');
+  const btnPrimary = document.getElementById('modal-btn-primary');
+  const btnSecondary = document.getElementById('modal-btn-secondary');
+  
+  icon.textContent = options.icon || '✅';
+  title.textContent = options.title || '';
+  message.innerHTML = options.message || '';
+  
+  btnPrimary.textContent = options.btnPrimaryText || 'Aceptar';
+  btnPrimary.className = options.btnPrimaryClass || 'btn btn-primary';
+  
+  if (options.btnSecondaryText) {
+    btnSecondary.textContent = options.btnSecondaryText;
+    btnSecondary.style.display = 'inline-block';
+    btnSecondary.className = options.btnSecondaryClass || 'btn btn-secondary';
+  } else {
+    btnSecondary.style.display = 'none';
+  }
+  
+  btnPrimary.onclick = () => {
+    overlay.classList.add('hidden');
+    if (options.onPrimary) options.onPrimary();
+  };
+  
+  btnSecondary.onclick = () => {
+    overlay.classList.add('hidden');
+    if (options.onSecondary) options.onSecondary();
+  };
+  
+  overlay.classList.remove('hidden');
+  btnPrimary.focus();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+// ===== VERIFICACIÓN Y CARGA =====
+async function checkFaseFinalHabilitada() {
+  const configRef = doc(db, 'config', 'app_config');
+  const configSnap = await getDoc(configRef);
+  if (configSnap.exists()) {
+    const data = configSnap.data();
+    document.getElementById('toggle-fase-final').checked = !!data.fase_final_habilitada;
+    document.getElementById('status-fase-final').textContent = data.fase_final_habilitada ? 'Habilitada' : 'Deshabilitada';
   }
 }
 
-// Toggle fase final
-document.getElementById('toggle-fase-final').addEventListener('change', async (e) => {
-  try {
-    const configRef = doc(db, 'config', 'app_config');
-    await setDoc(configRef, { fase_final_habilitada: e.target.checked }, { merge: true });
-    document.getElementById('status-fase-final').textContent = e.target.checked ? 'Habilitada' : 'Deshabilitada';
-    showAlert(e.target.checked ? 'Fase Final habilitada' : 'Fase Final deshabilitada', 'success');
-  } catch (err) {
-    console.error(err);
-    showAlert('Error actualizando configuración', 'danger');
-  }
-});
-
-// Cargar y renderizar partidos de grupos para admin
 async function cargarPartidosGrupos() {
   const container = document.getElementById('admin-grupos-container');
   container.innerHTML = '<div class="spinner"></div>';
@@ -66,55 +121,81 @@ async function cargarPartidosGrupos() {
   try {
     const q = query(collection(db, 'partidos_grupos'));
     const snapshot = await getDocs(q);
-    const partidos = [];
-    snapshot.forEach(d => partidos.push({ id: d.id, ...d.data() }));
-    
-    const orden = 'ABCDEFGHIJKL';
-    partidos.sort((a, b) => orden.indexOf(a.grupo) - orden.indexOf(b.grupo) || (a.fecha - b.fecha));
-    
     container.innerHTML = '';
-    let currentGrupo = '';
     
-    for (const p of partidos) {
-      if (p.grupo !== currentGrupo) {
-        currentGrupo = p.grupo;
-        const gTitle = document.createElement('h4');
-        gTitle.style.cssText = 'color: var(--accent); margin: 20px 0 10px 0; font-size: 1.2rem;';
-        gTitle.textContent = `Grupo ${p.grupo}`;
-        container.appendChild(gTitle);
-      }
-      
-      const div = document.createElement('div');
-      div.className = 'admin-match';
-      div.innerHTML = `
-        <div class="match-info">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <img src="${getFlagUrl(p.equipo1)}" style="width:24px; height:18px; border-radius:3px;">
-            <strong>${p.equipo1}</strong>
-          </div>
-        </div>
-        <div class="match-score">
-          <input type="number" min="0" max="20" style="width:55px; height:36px;" 
-            data-id="${p.id}" data-field="g1" value="${p.goles_equipo1 ?? ''}">
-          <span class="match-separator">:</span>
-          <input type="number" min="0" max="20" style="width:55px; height:36px;" 
-            data-id="${p.id}" data-field="g2" value="${p.goles_equipo2 ?? ''}">
-        </div>
-        <div class="match-info" style="text-align:right;">
-          <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
-            <strong>${p.equipo2}</strong>
-            <img src="${getFlagUrl(p.equipo2)}" style="width:24px; height:18px; border-radius:3px;">
-          </div>
-        </div>
-      `;
-      
-      container.appendChild(div);
-      
-      // Guardar en estado local
-      resultadosGrupos[p.id] = { g1: p.goles_equipo1, g2: p.goles_equipo2 };
+    if (snapshot.empty) {
+      container.innerHTML = '<p style="color: var(--text-muted);">No hay partidos de grupos. Carga los partidos primero.</p>';
+      return;
     }
     
-    // Listeners
+    // Guardar datos
+    partidosGruposData = {};
+    snapshot.forEach(d => partidosGruposData[d.id] = d.data());
+    
+    // Agrupar por grupo
+    const grupos = {};
+    for (const [id, data] of Object.entries(partidosGruposData)) {
+      if (!grupos[data.grupo]) grupos[data.grupo] = [];
+      grupos[data.grupo].push({ id, ...data });
+    }
+    
+    const gruposOrden = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+    
+    for (const grupo of gruposOrden) {
+      if (!grupos[grupo]) continue;
+      
+      const sorted = grupos[grupo].sort((a, b) => a.numero - b.numero);
+      
+      const title = document.createElement('h4');
+      title.style.cssText = 'color: var(--accent); margin: 20px 0 10px; font-size: 1.1rem;';
+      title.textContent = `Grupo ${grupo}`;
+      container.appendChild(title);
+      
+      for (const p of sorted) {
+        resultadosGrupos[p.id] = {
+          g1: p.goles_equipo1 ?? '',
+          g2: p.goles_equipo2 ?? '',
+          eq1: p.equipo1,
+          eq2: p.equipo2
+        };
+        
+        const div = document.createElement('div');
+        div.className = 'admin-match-input';
+        div.dataset.id = p.id;
+        div.style.flexWrap = 'wrap';
+        div.style.gap = '15px';
+        
+        const eq1Flag = getFlagUrl(p.equipo1);
+        const eq2Flag = getFlagUrl(p.equipo2);
+        const yaJugado = p.jugado ? 'disabled' : '';
+        
+        div.innerHTML = `
+          <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <small style="color:var(--text-muted);">${p.id}</small>
+            <span style="color:var(--accent); font-size:0.8rem;">${p.grupo}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:150px;">
+            <img src="${eq1Flag}" style="width:28px; height:20px; border-radius:3px;" onerror="this.src='https://flagcdn.com/w40/xx.png'">
+            <span style="font-weight:600; flex:1;">${p.equipo1}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:5px; flex:0 0 auto;">
+            <input type="number" min="0" max="20" style="width:50px; height:36px; text-align:center;"
+              data-id="${p.id}" data-field="g1" value="${p.goles_equipo1 ?? ''}" ${yaJugado} placeholder="0">
+            <span>:</span>
+            <input type="number" min="0" max="20" style="width:50px; height:36px; text-align:center;"
+              data-id="${p.id}" data-field="g2" value="${p.goles_equipo2 ?? ''}" ${yaJugado} placeholder="0">
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:150px; justify-content:flex-end;">
+            <span style="font-weight:600; text-align:right; flex:1;">${p.equipo2}</span>
+            <img src="${eq2Flag}" style="width:28px; height:20px; border-radius:3px;" onerror="this.src='https://flagcdn.com/w40/xx.png'">
+          </div>
+        `;
+        
+        container.appendChild(div);
+      }
+    }
+    
+    // Attach listeners
     container.querySelectorAll('input').forEach(inp => {
       inp.addEventListener('change', (e) => {
         const id = e.target.dataset.id;
@@ -126,193 +207,99 @@ async function cargarPartidosGrupos() {
     
   } catch (err) {
     console.error(err);
-    container.innerHTML = '<p style="color:var(--danger);">Error cargando partidos</p>';
+    container.innerHTML = '<p style="color:var(--danger);">Error cargando partidos de grupos</p>';
+    showToast('Error', 'No se pudieron cargar los partidos de grupos', 'error');
   }
 }
 
+function getFlagUrl(pais) {
+  if (!pais) return 'https://flagcdn.com/w40/xx.png';
+  const code = BANDERAS[pais] || 'xx';
+  return `https://flagcdn.com/w40/${code}.png`;
+}
+
+// Toggle fase final
+document.getElementById('toggle-fase-final').addEventListener('change', async (e) => {
+  try {
+    const configRef = doc(db, 'config', 'app_config');
+    await setDoc(configRef, { fase_final_habilitada: e.target.checked }, { merge: true });
+    document.getElementById('status-fase-final').textContent = e.target.checked ? 'Habilitada' : 'Deshabilitada';
+    showToast('Éxito', `Fase final ${e.target.checked ? 'habilitada' : 'deshabilitada'}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo cambiar el estado', 'error');
+  }
+});
+
 // Guardar resultados de grupos
 document.getElementById('btn-save-grupos').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-save-grupos');
+  btn.disabled = true;
+  
   try {
     const batch = writeBatch(db);
+    let count = 0;
     
     for (const [id, vals] of Object.entries(resultadosGrupos)) {
       const g1 = vals.g1 !== null && vals.g1 !== undefined ? parseInt(vals.g1) : null;
       const g2 = vals.g2 !== null && vals.g2 !== undefined ? parseInt(vals.g2) : null;
       
-      if (g1 === null || g2 === null) continue;
-      
-      const ref = doc(db, 'partidos_grupos', id);
-      batch.update(ref, {
-        goles_equipo1: g1,
-        goles_equipo2: g2,
-        jugado: true
+      if (g1 !== null && g2 !== null) {
+        const ref = doc(db, 'partidos_grupos', id);
+        batch.update(ref, {
+          goles_equipo1: g1,
+          goles_equipo2: g2,
+          jugado: true
+        });
+        count++;
+      }
+    }
+    
+    if (count === 0) {
+      showModal({
+        icon: '⚠️',
+        title: 'Sin cambios',
+        message: 'No hay resultados nuevos para guardar.',
+        btnPrimaryText: 'Entendido',
+        btnPrimaryClass: 'btn btn-primary'
       });
+      btn.disabled = false;
+      return;
     }
     
     await batch.commit();
-    showAlert('Resultados de grupos guardados', 'success');
     
-  } catch (err) {
-    console.error(err);
-    showAlert('Error guardando resultados', 'danger');
-  }
-});
-
-// Cargar partidos de fase final para admin
-async function cargarPartidosFinal() {
-  const container = document.getElementById('admin-final-container');
-  container.innerHTML = '<div class="spinner"></div>';
-  
-  try {
-    const q = query(collection(db, 'partidos_final'));
-    const snapshot = await getDocs(q);
-    const partidos = [];
-    snapshot.forEach(d => partidos.push({ id: d.id, ...d.data() }));
-    partidos.sort((a, b) => a.numero - b.numero);
+    // Recalcular puntos automáticamente
+    showToast('Info', 'Recalculando puntos...', 'info', 2000);
+    await recalcularTodosLosPuntos();
     
-    container.innerHTML = '';
-    const title = document.createElement('h4');
-    title.style.cssText = 'color: var(--accent); margin-bottom: 15px;';
-    title.textContent = 'Dieciseisavos de Final';
-    container.appendChild(title);
-    
-    for (const p of partidos) {
-      const div = document.createElement('div');
-      div.className = 'admin-match';
-      div.style.flexWrap = 'wrap';
-      div.style.gap = '15px';
-      
-      const eq1Flag = getFlagUrl(p.equipo1);
-      const eq2Flag = getFlagUrl(p.equipo2);
-      
-      div.innerHTML = `
-        <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-          <small style="color:var(--text-muted);">Partido #${p.numero} — ${p.id}</small>
-        </div>
-        <div class="match-info" style="flex:2; min-width:200px;">
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
-            <img src="${eq1Flag}" style="width:24px; height:18px; border-radius:3px;">
-            <input type="text" data-id="${p.id}" data-field="eq1" value="${p.equipo1}" 
-              style="width:120px; padding:6px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-weight:600;">
-          </div>
-        </div>
-        <div class="match-score" style="flex-direction:column; gap:5px; align-items:center;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input type="number" min="0" max="20" style="width:55px; height:36px;" 
-              data-id="${p.id}" data-field="g1" value="${p.goles_equipo1 ?? ''}" placeholder="90min">
-            <span>:</span>
-            <input type="number" min="0" max="20" style="width:55px; height:36px;" 
-              data-id="${p.id}" data-field="g2" value="${p.goles_equipo2 ?? ''}" placeholder="90min">
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input type="number" min="0" max="20" style="width:55px; height:36px; font-size:0.85rem;" 
-              data-id="${p.id}" data-field="p1" value="${p.penales_equipo1 ?? ''}" placeholder="Pen">
-            <span style="font-size:0.8rem; color:var(--text-muted);">Pen</span>
-            <input type="number" min="0" max="20" style="width:55px; height:36px; font-size:0.85rem;" 
-              data-id="${p.id}" data-field="p2" value="${p.penales_equipo2 ?? ''}" placeholder="Pen">
-          </div>
-        </div>
-        <div class="match-info" style="flex:2; text-align:right; min-width:200px;">
-          <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-bottom:5px;">
-            <input type="text" data-id="${p.id}" data-field="eq2" value="${p.equipo2}" 
-              style="width:120px; padding:6px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-weight:600; text-align:right;">
-            <img src="${eq2Flag}" style="width:24px; height:18px; border-radius:3px;">
-          </div>
-        </div>
-      `;
-      
-      container.appendChild(div);
-      resultadosFinal[p.id] = {
-        eq1: p.equipo1, eq2: p.equipo2,
-        g1: p.goles_equipo1, g2: p.goles_equipo2,
-        p1: p.penales_equipo1, p2: p.penales_equipo2
-      };
-    }
-    
-    container.querySelectorAll('input').forEach(inp => {
-      inp.addEventListener('change', (e) => {
-        const id = e.target.dataset.id;
-        const field = e.target.dataset.field;
-        if (!resultadosFinal[id]) resultadosFinal[id] = {};
-        if (field === 'eq1' || field === 'eq2') {
-          resultadosFinal[id][field] = e.target.value;
-        } else {
-          resultadosFinal[id][field] = e.target.value === '' ? null : parseInt(e.target.value);
-        }
-      });
+    showModal({
+      icon: '✅',
+      title: '¡Resultados Guardados!',
+      message: `Se guardaron los resultados de <b>${count} partidos</b> de la fase de grupos.<br><br>Los puntos de todos los participantes han sido recalculados automáticamente.`,
+      btnPrimaryText: 'Continuar',
+      btnPrimaryClass: 'btn btn-success'
     });
     
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = '<p style="color:var(--danger);">Error cargando partidos final</p>';
-  }
-}
-
-// Guardar resultados de fase final
-document.getElementById('btn-save-final').addEventListener('click', async () => {
-  try {
-    const batch = writeBatch(db);
-    
-    for (const [id, vals] of Object.entries(resultadosFinal)) {
-      const g1 = vals.g1 !== null && vals.g1 !== undefined ? parseInt(vals.g1) : null;
-      const g2 = vals.g2 !== null && vals.g2 !== undefined ? parseInt(vals.g2) : null;
-      const p1 = vals.p1 !== null && vals.p1 !== undefined ? parseInt(vals.p1) : null;
-      const p2 = vals.p2 !== null && vals.p2 !== undefined ? parseInt(vals.p2) : null;
-      const eq1 = vals.eq1 || null;
-      const eq2 = vals.eq2 || null;
-      
-      const ref = doc(db, 'partidos_final', id);
-      const updateData = {};
-      
-      if (eq1 !== null) updateData.equipo1 = eq1;
-      if (eq2 !== null) updateData.equipo2 = eq2;
-      
-      if (g1 !== null && g2 !== null) {
-        updateData.goles_equipo1 = g1;
-        updateData.goles_equipo2 = g2;
-        updateData.jugado = true;
-        
-        // Determinar ganador
-        let ganador = null;
-        if (g1 > g2) ganador = 'equipo1';
-        else if (g2 > g1) ganador = 'equipo2';
-        else if (p1 !== null && p2 !== null) {
-          if (p1 > p2) ganador = 'equipo1';
-          else if (p2 > p1) ganador = 'equipo2';
-        }
-        updateData.ganador = ganador;
-        
-        if (p1 !== null) updateData.penales_equipo1 = p1;
-        if (p2 !== null) updateData.penales_equipo2 = p2;
-      }
-      
-      if (Object.keys(updateData).length > 0) {
-        batch.update(ref, updateData);
-      }
-    }
-    
-    await batch.commit();
-    showAlert('Resultados de fase final guardados', 'success');
+    await cargarPartidosGrupos();
     
   } catch (err) {
     console.error(err);
-    showAlert('Error guardando resultados final', 'danger');
+    showToast('Error', 'Error al guardar: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
   }
 });
 
-// Recalcular puntajes
-document.getElementById('btn-recalcular').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-recalcular');
-  btn.disabled = true;
-  btn.textContent = '⏳ Recalculando...';
-  
+// Recalcular TODOS los puntos (automático después de cada guardado)
+async function recalcularTodosLosPuntos() {
   try {
     // 1. Obtener todos los usuarios
     const usersSnap = await getDocs(collection(db, 'users'));
     const usuarios = [];
     usersSnap.forEach(d => usuarios.push({ id: d.id, ...d.data() }));
     
-    // 2. Obtener todos los partidos de grupos jugados
+    // 2. Obtener partidos de grupos jugados
     const partidosGruposSnap = await getDocs(collection(db, 'partidos_grupos'));
     const partidosGrupos = {};
     partidosGruposSnap.forEach(d => {
@@ -320,7 +307,7 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
       if (data.jugado) partidosGrupos[d.id] = data;
     });
     
-    // 3. Obtener todas las predicciones de grupos
+    // 3. Obtener predicciones de grupos
     const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
     const predsGrupos = {};
     predsGruposSnap.forEach(d => {
@@ -329,12 +316,12 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
       predsGrupos[data.user_id][data.partido_id] = data;
     });
     
-    // 4. Calcular puntos fase de grupos por partido
+    // 4. Calcular puntos de fase de grupos
     const puntosPorUsuario = {};
     
-    for (const user of usuarios) {
-      let puntosGrupos = 0;
-      const preds = predsGrupos[user.id] || {};
+    for (const u of usuarios) {
+      let ptsGrupos = 0;
+      const preds = predsGrupos[u.id] || {};
       
       for (const [partidoId, partido] of Object.entries(partidosGrupos)) {
         const pred = preds[partidoId];
@@ -345,28 +332,17 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
         const p1 = pred.prediccion_equipo1;
         const p2 = pred.prediccion_equipo2;
         
-        // Marcador exacto
-        if (p1 === g1 && p2 === g2) {
-          puntosGrupos += 3;
-        } 
-        // Ganador o empate
-        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) {
-          puntosGrupos += 1;
-        }
+        if (p1 === g1 && p2 === g2) ptsGrupos += 3;
+        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) ptsGrupos += 1;
       }
       
-      // TODO: Calcular puntos extra por clasificados (1 por equipo clasificado, 1 extra por posición exacta)
-      // Esto requiere calcular la tabla de posiciones real vs predicha
-      
-      puntosPorUsuario[user.id] = { puntosGrupos, puntosFinal: user.puntos_fase_final || 0 };
+      puntosPorUsuario[u.id] = { puntosGrupos: ptsGrupos, puntosFinal: u.puntos_fase_final || 0 };
     }
     
-    // 5. Calcular puntos fase final
+    // 5. Calcular puntos de fase final
     const partidosFinalSnap = await getDocs(collection(db, 'partidos_final'));
     const allPartidosFinal = {};
-    partidosFinalSnap.forEach(d => {
-      allPartidosFinal[d.id] = d.data();
-    });
+    partidosFinalSnap.forEach(d => allPartidosFinal[d.id] = d.data());
     
     const partidosFinalJugados = {};
     for (const [id, p] of Object.entries(allPartidosFinal)) {
@@ -381,8 +357,7 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
       predsFinal[data.user_id][data.partido_id] = data;
     });
     
-    // Función para determinar ganador real de un partido
-    function getGanadorReal(partido) {
+    const getGanadorReal = (partido) => {
       if (!partido.jugado) return null;
       const g1 = partido.goles_equipo1;
       const g2 = partido.goles_equipo2;
@@ -390,25 +365,22 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
       if (g2 > g1) return partido.equipo2;
       const p1 = partido.penales_equipo1;
       const p2 = partido.penales_equipo2;
-      if (p1 !== null && p2 !== null) {
-        if (p1 > p2) return partido.equipo1;
-        if (p2 > p1) return partido.equipo2;
+      if (p1 !== null && p2 !== null && p1 !== p2) {
+        return p1 > p2 ? partido.equipo1 : partido.equipo2;
       }
       return null;
-    }
+    };
     
-    // Función para determinar perdedor real de un partido
-    function getPerdedorReal(partido) {
+    const getPerdedorReal = (partido) => {
       const ganador = getGanadorReal(partido);
       if (!ganador) return null;
       return ganador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
-    }
+    };
     
-    for (const user of usuarios) {
-      let puntosFinal = 0;
-      const preds = predsFinal[user.id] || {};
+    for (const u of usuarios) {
+      let ptsFinal = 0;
+      const preds = predsFinal[u.id] || {};
       
-      // 5a. Puntos por partidos jugados (32 partidos)
       for (const [partidoId, partido] of Object.entries(partidosFinalJugados)) {
         const pred = preds[partidoId];
         if (!pred) continue;
@@ -422,187 +394,34 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
         
         let ptsPartido = 0;
         
-        // Marcador exacto 90 min
-        if (p1 === g1 && p2 === g2) {
-          ptsPartido += 3;
-        } 
-        // Empate en 90 min (cualquier marcador)
-        else if (g1 === g2 && p1 === p2) {
-          ptsPartido += 1;
-        }
-        // Ganador de 90 min (sin exacto)
-        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1)) {
-          ptsPartido += 1;
-        }
+        if (p1 === g1 && p2 === g2) ptsPartido += 3;
+        else if (g1 === g2 && p1 === p2) ptsPartido += 1;
+        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1)) ptsPartido += 1;
         
-        // Penales exactos
         if (g1 === g2) {
           const rp1 = partido.penales_equipo1;
           const rp2 = partido.penales_equipo2;
           if (rp1 !== null && rp2 !== null && pg1 !== undefined && pg2 !== undefined) {
-            if (pg1 === rp1 && pg2 === rp2) {
-              ptsPartido += 3;
-            } else {
-              const realGanadorPenales = rp1 > rp2 ? 'equipo1' : 'equipo2';
-              const predGanadorPenales = pg1 > pg2 ? 'equipo1' : 'equipo2';
-              if (realGanadorPenales === predGanadorPenales) {
-                ptsPartido += 1;
-              }
+            if (pg1 === rp1 && pg2 === rp2) ptsPartido += 3;
+            else {
+              const realGan = rp1 > rp2 ? 'equipo1' : 'equipo2';
+              const predGan = pg1 > pg2 ? 'equipo1' : 'equipo2';
+              if (realGan === predGan) ptsPartido += 1;
             }
           }
         }
         
-        // Equipo que avanza
         const realGanador = getGanadorReal(partido);
         const predGanador = pred.prediccion_ganador;
-        if (realGanador && predGanador && realGanador === predGanador) {
-          ptsPartido += 1;
-        }
+        if (realGanador && predGanador && realGanador === predGanador) ptsPartido += 1;
         
-        puntosFinal += ptsPartido;
+        ptsFinal += ptsPartido;
       }
       
-      // 5b. Puntos extra por ronda alcanzada (basado en resultados reales)
-      // Calcular quién llegó a cada ronda según resultados reales
-      const equiposPorRonda = {
-        octavos: new Set(),
-        cuartos: new Set(),
-        semis: new Set(),
-        finalistas: new Set(),
-        campeon: null,
-        subcampeon: null,
-        tercero: null
-      };
-      
-      // Procesar cada ronda
-      for (const [id, p] of Object.entries(allPartidosFinal)) {
-        if (!p.jugado) continue;
-        
-        const ganador = getGanadorReal(p);
-        const perdedor = getPerdedorReal(p);
-        
-        if (p.ronda === 'dieciseisavos' && ganador) {
-          equiposPorRonda.octavos.add(ganador);
-        } else if (p.ronda === 'octavos' && ganador) {
-          equiposPorRonda.cuartos.add(ganador);
-        } else if (p.ronda === 'cuartos' && ganador) {
-          equiposPorRonda.semis.add(ganador);
-        } else if (p.ronda === 'semis' && ganador && perdedor) {
-          equiposPorRonda.finalistas.add(ganador);
-          equiposPorRonda.finalistas.add(perdedor);
-        } else if (p.ronda === 'final' && ganador && perdedor) {
-          equiposPorRonda.campeon = ganador;
-          equiposPorRonda.subcampeon = perdedor;
-        } else if (p.ronda === 'tercer_lugar' && ganador) {
-          equiposPorRonda.tercero = ganador;
-        }
-      }
-      
-      // Para cada usuario, revisar sus predicciones y ver si acertó quién llegó a cada ronda
-      // Necesitamos simular el bracket según las predicciones del usuario
-      const predEquiposPorRonda = {
-        octavos: new Set(),
-        cuartos: new Set(),
-        semis: new Set(),
-        finalistas: new Set(),
-        campeon: null,
-        subcampeon: null
-      };
-      
-      // Simular bracket según predicciones del usuario
-      const predBracket = {};
-      for (const [id, pred] of Object.entries(preds)) {
-        if (!pred || pred.g1 === '' || pred.g2 === '' || !pred.prediccion_ganador) continue;
-        
-        const partido = allPartidosFinal[id];
-        if (!partido) continue;
-        
-        // Determinar quién ganó según la predicción del usuario
-        const g1 = parseInt(pred.g1);
-        const g2 = parseInt(pred.g2);
-        const p1 = pred.prediccion_penales_equipo1 !== undefined ? parseInt(pred.prediccion_penales_equipo1) : null;
-        const p2 = pred.prediccion_penales_equipo2 !== undefined ? parseInt(pred.prediccion_penales_equipo2) : null;
-        
-        let predGanador = null;
-        
-        if (g1 > g2) {
-          predGanador = partido.equipo1;
-        } else if (g2 > g1) {
-          predGanador = partido.equipo2;
-        } else if (p1 !== null && p2 !== null) {
-          if (p1 > p2) predGanador = partido.equipo1;
-          else if (p2 > p1) predGanador = partido.equipo2;
-        } else {
-          predGanador = pred.prediccion_ganador;
-        }
-        
-        predBracket[id] = predGanador;
-      }
-      
-      // Calcular quién llegó a cada ronda según predicciones
-      for (const [id, p] of Object.entries(allPartidosFinal)) {
-        if (p.ronda === 'dieciseisavos') {
-          const ganador = predBracket[id];
-          if (ganador) predEquiposPorRonda.octavos.add(ganador);
-        } else if (p.ronda === 'octavos') {
-          const ganador = predBracket[id];
-          if (ganador) predEquiposPorRonda.cuartos.add(ganador);
-        } else if (p.ronda === 'cuartos') {
-          const ganador = predBracket[id];
-          if (ganador) predEquiposPorRonda.semis.add(ganador);
-        } else if (p.ronda === 'semis') {
-          const ganador = predBracket[id];
-          const perdedor = ganador === p.equipo1 ? p.equipo2 : p.equipo1;
-          if (ganador) {
-            predEquiposPorRonda.finalistas.add(ganador);
-            predEquiposPorRonda.finalistas.add(perdedor);
-          }
-        } else if (p.ronda === 'final') {
-          const ganador = predBracket[id];
-          const perdedor = ganador === p.equipo1 ? p.equipo2 : p.equipo1;
-          if (ganador) {
-            predEquiposPorRonda.campeon = ganador;
-            predEquiposPorRonda.subcampeon = perdedor;
-          }
-        }
-      }
-      
-      // Calcular puntos extra: comparar resultados reales vs predicciones del usuario
-      // Octavos: 1 pt por cada equipo real que el usuario predijo que llegaría
-      for (const equipo of equiposPorRonda.octavos) {
-        if (predEquiposPorRonda.octavos.has(equipo)) puntosFinal += 1;
-      }
-      
-      // Cuartos: 1 pt
-      for (const equipo of equiposPorRonda.cuartos) {
-        if (predEquiposPorRonda.cuartos.has(equipo)) puntosFinal += 1;
-      }
-      
-      // Semifinales: 1 pt
-      for (const equipo of equiposPorRonda.semis) {
-        if (predEquiposPorRonda.semis.has(equipo)) puntosFinal += 1;
-      }
-      
-      // Finalistas: 1 pt
-      for (const equipo of equiposPorRonda.finalistas) {
-        if (predEquiposPorRonda.finalistas.has(equipo)) puntosFinal += 1;
-      }
-      
-      // Subcampeón: 2 pts
-      if (equiposPorRonda.subcampeon && predEquiposPorRonda.subcampeon === equiposPorRonda.subcampeon) {
-        puntosFinal += 2;
-      }
-      
-      // Campeón: 4 pts
-      if (equiposPorRonda.campeon && predEquiposPorRonda.campeon === equiposPorRonda.campeon) {
-        puntosFinal += 4;
-      }
-      
-      if (!puntosPorUsuario[user.id]) puntosPorUsuario[user.id] = { puntosGrupos: 0, puntosFinal: 0 };
-      puntosPorUsuario[user.id].puntosFinal = puntosFinal;
+      puntosPorUsuario[u.id].puntosFinal = ptsFinal;
     }
     
-    // 6. Actualizar puntos en Firestore
+    // 6. Guardar puntos en Firestore
     const batch = writeBatch(db);
     for (const [userId, pts] of Object.entries(puntosPorUsuario)) {
       const ref = doc(db, 'users', userId);
@@ -614,517 +433,571 @@ document.getElementById('btn-recalcular').addEventListener('click', async () => 
     }
     await batch.commit();
     
-    showAlert(`Puntajes recalculados para ${Object.keys(puntosPorUsuario).length} participantes`, 'success');
+    showToast('Puntos Recalculados', `Puntajes actualizados para ${usuarios.length} participantes`, 'success', 3000);
+    
+  } catch (err) {
+    console.error('Error recalculando puntos:', err);
+    showToast('Error', 'No se pudieron recalcular los puntos: ' + err.message, 'error');
+  }
+}
+
+// ===== FASE FINAL: SISTEMA DE PASOS =====
+async function cargarPartidosFinal() {
+  const container = document.getElementById('round-container');
+  container.innerHTML = '<div class="spinner"></div>';
+  
+  try {
+    const q = query(collection(db, 'partidos_final'));
+    const snapshot = await getDocs(q);
+    partidosFinalData = [];
+    
+    snapshot.forEach(d => partidosFinalData.push({ id: d.id, ...d.data() }));
+    partidosFinalData.sort((a, b) => a.numero - b.numero);
+    
+    // Organizar por ronda
+    partidosFinalPorRonda = {};
+    for (const r of RONDAS) partidosFinalPorRonda[r] = [];
+    for (const p of partidosFinalData) {
+      if (partidosFinalPorRonda[p.ronda]) {
+        partidosFinalPorRonda[p.ronda].push(p);
+      }
+    }
+    
+    // Inicializar resultados
+    resultadosFinal = {};
+    for (const p of partidosFinalData) {
+      resultadosFinal[p.id] = {
+        g1: p.goles_equipo1 ?? '',
+        g2: p.goles_equipo2 ?? '',
+        p1: p.penales_equipo1 ?? '',
+        p2: p.penales_equipo2 ?? '',
+        eq1: p.equipo1,
+        eq2: p.equipo2,
+        jugado: p.jugado
+      };
+    }
+    
+    await cargarPrediccionesUsuario();
+    renderizarRondaActual();
+    actualizarUI();
     
   } catch (err) {
     console.error(err);
-    showAlert('Error recalculando puntajes: ' + err.message, 'danger');
-  } finally {
+    container.innerHTML = '<p style="color:var(--danger);">Error cargando partidos finales</p>';
+    showToast('Error', 'No se pudieron cargar los partidos de fase final', 'error');
+  }
+}
+
+async function cargarPrediccionesUsuario() {
+  // Para validaraciones, necesitamos las predicciones de TODOS los usuarios
+  const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
+  prediccionesLocales = {};
+  predsGruposSnap.forEach(d => {
+    const data = d.data();
+    prediccionesLocales[data.partido_id] = data;
+  });
+}
+
+function calcularEquipoDinamico(partidoId, esEquipo1) {
+  const partido = partidosFinalData.find(p => p.id === partidoId);
+  if (!partido) return 'Por definir';
+  
+  // Dieciseisavos: usar equipo real de la BD
+  if (partido.ronda === 'dieciseisavos') {
+    return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  }
+  
+  // Extraer source del placeholder
+  let sourceId = null;
+  if (partido.ronda === 'tercer_lugar') {
+    sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+  } else {
+    sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+  }
+  
+  if (!sourceId) {
+    // Extraer del nombre del placeholder
+    const equipoNombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
+    const match = equipoNombre.match(/(F\d+)/);
+    if (match) sourceId = match[1];
+  }
+  
+  if (!sourceId) return 'Por definir';
+  
+  // Obtener resultado del partido source
+  const resultSource = resultadosFinal[sourceId];
+  if (!resultSource || resultSource.g1 === '' || resultSource.g2 === '') {
+    return esEquipo1 ? `Ganador ${sourceId}` : `Ganador ${sourceId}`;
+  }
+  
+  const g1 = resultSource.g1;
+  const g2 = resultSource.g2;
+  const p1 = resultSource.p1 !== '' ? parseInt(resultSource.p1) : null;
+  const p2 = resultSource.p2 !== '' ? parseInt(resultSource.p2) : null;
+  
+  const sourcePartido = partidosFinalData.find(p => p.id === sourceId);
+  if (!sourcePartido) return 'Por definir';
+  
+  // Calcular ganador real
+  let ganador = null;
+  if (g1 > g2) {
+    ganador = sourcePartido.equipo1;
+  } else if (g2 > g1) {
+    ganador = sourcePartido.equipo2;
+  } else if (p1 !== null && p2 !== null && p1 !== p2) {
+    ganador = p1 > p2 ? sourcePartido.equipo1 : sourcePartido.equipo2;
+  }
+  
+  if (!ganador) return `Ganador ${sourceId}`;
+  
+  // Para tercer lugar, devolver el perdedor
+  if (partido.ronda === 'tercer_lugar') {
+    return ganador === sourcePartido.equipo1 ? sourcePartido.equipo2 : sourcePartido.equipo1;
+  }
+  
+  return ganador;
+}
+
+function renderizarRondaActual() {
+  const ronda = RONDAS[rondaActualIndex];
+  const container = document.getElementById('round-container');
+  const partidos = partidosFinalPorRonda[ronda] || [];
+  
+  let html = `<h3 style="text-align:center; margin-bottom: 20px; color: var(--accent);">${NOMBRES_RONDAS[ronda]}</h3>`;
+  html += '<div style="display: grid; gap: 12px;">';
+  
+  for (const p of partidos) {
+    const eq1Calculado = calcularEquipoDinamico(p.id, true);
+    const eq2Calculado = calcularEquipoDinamico(p.id, false);
+    const yaJugado = resultadosFinal[p.id]?.jugado;
+    const pred = resultadosFinal[p.id] || {};
+    const g1 = pred.g1 ?? '';
+    const g2 = pred.g2 ?? '';
+    const p1 = pred.p1 ?? '';
+    const p2 = pred.p2 ?? '';
+    
+    // Verificar si mostrar penales
+    const g1Num = g1 !== '' ? parseInt(g1) : null;
+    const g2Num = g2 !== '' ? parseInt(g2) : null;
+    const esEmpate = g1Num !== null && g2Num !== null && g1Num === g2Num;
+    const mostrarPenales = esEmpate;
+    const penalesClass = mostrarPenales ? 'visible' : '';
+    
+    // Validación
+    let validationClass = '';
+    if (yaJugado) {
+      validationClass = 'validation-success';
+    } else if (g1Num !== null && g2Num !== null) {
+      if (g1Num === g2Num && (p1 === '' || p2 === '' || parseInt(p1) === parseInt(p2))) {
+        validationClass = 'validation-error';
+      }
+    }
+    
+    html += `
+      <div class="admin-match-input ${validationClass}" data-id="${p.id}" data-ronda="${ronda}">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <small style="color:var(--text-muted);">${p.id} — Ronda #${p.numero}</small>
+          ${yaJugado ? '<span style="color:#4caf50; font-size:0.8rem;">✓ Jugado</span>' : '<span style="color:var(--text-muted); font-size:0.8rem;">Pendiente</span>'}
+        </div>
+        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px;">
+            <img src="${getFlagUrl(eq1Calculado)}" style="width:32px; height:24px; border-radius:4px; object-fit:cover;" onerror="this.style.display='none'">
+            <span style="font-weight:600; font-size:0.95rem;">${eq1Calculado}</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px; min-width:130px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="number" min="0" max="20" style="width:55px; height:42px; text-align:center; font-size:1.1rem;"
+                data-field="g1" data-id="${p.id}" value="${g1}" ${yaJugado ? 'disabled' : ''} placeholder="0">
+              <span style="font-size:1.2rem;">:</span>
+              <input type="number" min="0" max="20" style="width:55px; height:42px; text-align:center; font-size:1.1rem;"
+                data-field="g2" data-id="${p.id}" value="${g2}" ${yaJugado ? 'disabled' : ''} placeholder="0">
+            </div>
+            <div class="penales-box ${penalesClass}" style="display:${mostrarPenales ? 'flex' : 'none'};">
+              <input type="number" min="0" max="20" style="width:45px; height:35px; text-align:center; font-size:0.95rem;"
+                data-field="p1" data-id="${p.id}" value="${p1}" ${yaJugado ? 'disabled' : ''} placeholder="Pen">
+              <span style="font-size:0.75rem; color:var(--text-muted);">Penales</span>
+              <input type="number" min="0" max="20" style="width:45px; height:35px; text-align:center; font-size:0.95rem;"
+                data-field="p2" data-id="${p.id}" value="${p2}" ${yaJugado ? 'disabled' : ''} placeholder="Pen">
+            </div>
+          </div>
+          <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+            <span style="font-weight:600; font-size:0.95rem; text-align:right;">${eq2Calculado}</span>
+            <img src="${getFlagUrl(eq2Calculado)}" style="width:32px; height:24px; border-radius:4px; object-fit:cover;" onerror="this.style.display='none'">
+          </div>
+        </div>
+        ${esEmpate && (p1 === '' || p2 === '' || parseInt(p1) === parseInt(p2)) ? `
+          <div style="margin-top:8px; padding:6px 10px; background:rgba(231,76,60,0.2); border-radius:6px; font-size:0.8rem; color:#e74c3c;">
+            ⚠️ Si hay empate, los penales son obligatorios y no pueden ser iguales
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  html += '</div>';
+  container.innerHTML = html;
+  
+  // Attach listeners
+  container.querySelectorAll('input:not([disabled])').forEach(inp => {
+    inp.addEventListener('change', handleInputChange);
+    inp.addEventListener('input', handleInputChange);
+  });
+}
+
+function handleInputChange(e) {
+  const id = e.target.dataset.id;
+  const field = e.target.dataset.field;
+  const value = e.target.value;
+  
+  if (!resultadosFinal[id]) resultadosFinal[id] = {};
+  resultadosFinal[id][field] = value;
+  
+  if (field === 'g1' || field === 'g2') {
+    resultadosFinal[id].jugado = false;
+  }
+  
+  // Actualizar visualización de la card
+  actualizarCardVisual(id);
+}
+
+function actualizarCardVisual(partidoId) {
+  const card = document.querySelector(`.admin-match-input[data-id="${partidoId}"]`);
+  if (!card) return;
+  
+  const pred = resultadosFinal[partidoId];
+  if (!pred) return;
+  
+  const g1 = pred.g1 !== '' ? parseInt(pred.g1) : null;
+  const g2 = pred.g2 !== '' ? parseInt(pred.g2) : null;
+  
+  // Actualizar penales
+  const penalesBox = card.querySelector('.penales-box');
+  if (penalesBox) {
+    if (g1 !== null && g2 !== null && g1 === g2) {
+      penalesBox.classList.add('visible');
+      penalesBox.style.display = 'flex';
+    } else {
+      penalesBox.classList.remove('visible');
+      penalesBox.style.display = 'none';
+      // Limpiar penales
+      pred.p1 = '';
+      pred.p2 = '';
+      const p1Input = penalesBox.querySelector('[data-field="p1"]');
+      const p2Input = penalesBox.querySelector('[data-field="p2"]');
+      if (p1Input) p1Input.value = '';
+      if (p2Input) p2Input.value = '';
+    }
+  }
+  
+  // Validación
+  card.classList.remove('validation-error', 'validation-success');
+  if (g1 !== null && g2 !== null) {
+    if (g1 === g2 && (pred.p1 === '' || pred.p2 === '' || parseInt(pred.p1) === parseInt(pred.p2))) {
+      card.classList.add('validation-error');
+    }
+  }
+}
+
+function actualizarUI() {
+  // Tabs
+  const tabs = document.querySelectorAll('.step-btn');
+  tabs.forEach((tab, idx) => {
+    tab.classList.remove('active', 'completed', 'has-errors');
+    if (idx === rondaActualIndex) {
+      tab.classList.add('active');
+    } else if (rondaEstaCompleta(RONDAS[idx])) {
+      tab.classList.add('completed');
+    } else if (rondaTieneErrores(RONDAS[idx])) {
+      tab.classList.add('has-errors');
+    }
+  });
+  
+  // Progreso
+  const progreso = ((rondaActualIndex + 1) / RONDAS.length) * 100;
+  document.getElementById('progress-fill').style.width = `${progreso}%`;
+  document.getElementById('progress-text').textContent = `Paso ${rondaActualIndex + 1} de ${RONDAS.length}: ${NOMBRES_RONDAS[RONDAS[rondaActualIndex]]}`;
+  
+  // Botones navegación
+  document.getElementById('btn-prev-round').disabled = rondaActualIndex === 0;
+  document.getElementById('btn-next-round').textContent = rondaActualIndex === RONDAS.length - 1 ? 'Revisar Resumen →' : 'Siguiente →';
+  
+  actualizarEstadoBotonGuardar();
+}
+
+function rondaEstaCompleta(ronda) {
+  const partidos = partidosFinalPorRonda[ronda] || [];
+  for (const p of partidos) {
+    if (resultadosFinal[p.id]?.jugado) continue;
+    const pred = resultadosFinal[p.id];
+    if (!pred || pred.g1 === '' || pred.g2 === '') return false;
+    const g1 = parseInt(pred.g1);
+    const g2 = parseInt(pred.g2);
+    if (g1 === g2) {
+      if (pred.p1 === '' || pred.p2 === '') return false;
+      if (parseInt(pred.p1) === parseInt(pred.p2)) return false;
+    }
+  }
+  return partidos.length > 0;
+}
+
+function rondaTieneErrores(ronda) {
+  const partidos = partidosFinalPorRonda[ronda] || [];
+  for (const p of partidos) {
+    const pred = resultadosFinal[p.id];
+    if (!pred || pred.g1 === '' || pred.g2 === '') continue;
+    const g1 = parseInt(pred.g1);
+    const g2 = parseInt(pred.g2);
+    if (g1 === g2) {
+      if (pred.p1 === '' || pred.p2 === '') return true;
+      if (parseInt(pred.p1) === parseInt(pred.p2)) return true;
+    }
+  }
+  return false;
+}
+
+function actualizarEstadoBotonGuardar() {
+  const btn = document.getElementById('btn-save-round');
+  const status = document.getElementById('save-status');
+  const ronda = RONDAS[rondaActualIndex];
+  const partidos = partidosFinalPorRonda[ronda] || [];
+  
+  let incompletos = 0;
+  let errores = 0;
+  
+  for (const p of partidos) {
+    if (resultadosFinal[p.id]?.jugado) continue;
+    const pred = resultadosFinal[p.id];
+    if (!pred || pred.g1 === '' || pred.g2 === '') {
+      incompletos++;
+    } else {
+      const g1 = parseInt(pred.g1);
+      const g2 = parseInt(pred.g2);
+      if (g1 === g2) {
+        if (pred.p1 === '' || pred.p2 === '') errores++;
+        else if (parseInt(pred.p1) === parseInt(pred.p2)) errores++;
+      }
+    }
+  }
+  
+  const jugados = partidos.filter(p => resultadosFinal[p.id]?.jugado).length;
+  
+  if (errores > 0) {
+    btn.disabled = true;
+    status.textContent = `⚠️ ${errores} partido(s) con errores en penales`;
+    status.style.color = 'var(--danger)';
+  } else if (incompletos > 0) {
+    btn.disabled = true;
+    status.textContent = `${jugados}/${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} completados`;
+    status.style.color = 'var(--text-muted)';
+  } else {
     btn.disabled = false;
-    btn.textContent = '🔄 Recalcular Puntajes';
+    status.textContent = `✓ ${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} listos para guardar`;
+    status.style.color = '#4caf50';
+  }
+}
+
+// Navegación
+function irARonda(index) {
+  if (index < 0 || index >= RONDAS.length) return;
+  rondaActualIndex = index;
+  renderizarRondaActual();
+  actualizarUI();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('btn-prev-round').addEventListener('click', () => irARonda(rondaActualIndex - 1));
+document.getElementById('btn-next-round').addEventListener('click', () => {
+  if (rondaActualIndex === RONDAS.length - 1) {
+    mostrarResumenFinal();
+  } else {
+    irARonda(rondaActualIndex + 1);
   }
 });
 
-// Inicializar Base de Datos
-document.getElementById('btn-init-db').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-init-db');
-  const status = document.getElementById('init-status');
+document.getElementById('steps-bar').addEventListener('click', (e) => {
+  const tab = e.target.closest('.step-btn');
+  if (!tab) return;
+  const ronda = tab.dataset.ronda;
+  const idx = RONDAS.indexOf(ronda);
+  if (idx >= 0) irARonda(idx);
+});
+
+// Guardar resultados de la ronda actual
+document.getElementById('btn-save-round').addEventListener('click', async () => {
+  if (isSaving) return;
+  
+  const ronda = RONDAS[rondaActualIndex];
+  const partidos = partidosFinalPorRonda[ronda] || [];
+  
+  // Validar
+  let errores = 0;
+  for (const p of partidos) {
+    const pred = resultadosFinal[p.id];
+    if (!pred || pred.g1 === '' || pred.g2 === '') {
+      errores++;
+    } else {
+      const g1 = parseInt(pred.g1);
+      const g2 = parseInt(pred.g2);
+      if (g1 === g2) {
+        if (pred.p1 === '' || pred.p2 === '' || parseInt(pred.p1) === parseInt(pred.p2)) {
+          errores++;
+        }
+      }
+    }
+  }
+  
+  if (errores > 0) {
+    showModal({
+      icon: '⚠️',
+      title: 'No se puede guardar',
+      message: `Hay ${errores} partido(s) con errores o incompletos. Corrige los errores antes de guardar.`,
+      btnPrimaryText: 'Entendido',
+      btnPrimaryClass: 'btn btn-warning'
+    });
+    return;
+  }
+  
+  // Confirmación
+  showModal({
+    icon: '💾',
+    title: `¿Guardar Resultados de ${NOMBRES_RONDAS[ronda]}?`,
+    message: `Se guardarán los resultados de <b>${partidos.length} partidos</b>.<br><br>Los puntos de todos los participantes se recalcularán automáticamente.`,
+    btnPrimaryText: '✅ Confirmar y Guardar',
+    btnPrimaryClass: 'btn btn-success',
+    btnSecondaryText: 'Cancelar',
+    btnSecondaryClass: 'btn btn-secondary',
+    onPrimary: async () => {
+      await guardarRondaActual();
+    }
+  });
+});
+
+async function guardarRondaActual() {
+  if (isSaving) return;
+  isSaving = true;
+  const btn = document.getElementById('btn-save-round');
+  const status = document.getElementById('save-status');
+  
   btn.disabled = true;
-  status.textContent = 'Verificando...';
+  status.textContent = 'Guardando...';
   
   try {
-    // Verificar si ya existen partidos
-    const existing = await getDocs(collection(db, 'partidos_grupos'));
-    if (!existing.empty) {
-      status.innerHTML = '<span style="color: var(--accent);">⚠️ Ya existen partidos. Si quieres reiniciar, usa el botón rojo "Reiniciar Todo".</span>';
+    const batch = writeBatch(db);
+    const ronda = RONDAS[rondaActualIndex];
+    const partidos = partidosFinalPorRonda[ronda] || [];
+    let count = 0;
+    
+    for (const p of partidos) {
+      const pred = resultadosFinal[p.id];
+      if (!pred || pred.g1 === '' || pred.g2 === '') continue;
+      
+      const g1 = parseInt(pred.g1);
+      const g2 = parseInt(pred.g2);
+      const p1 = pred.p1 !== '' ? parseInt(pred.p1) : null;
+      const p2 = pred.p2 !== '' ? parseInt(pred.p2) : null;
+      
+      // Determinar ganador
+      let ganador = null;
+      if (g1 > g2) {
+        ganador = 'equipo1';
+      } else if (g2 > g1) {
+        ganador = 'equipo2';
+      } else if (p1 !== null && p2 !== null && p1 !== p2) {
+        ganador = p1 > p2 ? 'equipo1' : 'equipo2';
+      }
+      
+      const ref = doc(db, 'partidos_final', p.id);
+      const updateData = {
+        goles_equipo1: g1,
+        goles_equipo2: g2,
+        jugado: true,
+        ganador: ganador
+      };
+      
+      if (p1 !== null) updateData.penales_equipo1 = p1;
+      if (p2 !== null) updateData.penales_equipo2 = p2;
+      
+      batch.update(ref, updateData);
+      
+      // Marcar como jugado en local
+      resultadosFinal[p.id].jugado = true;
+      
+      count++;
+    }
+    
+    if (count === 0) {
+      showModal({
+        icon: '⚠️',
+        title: 'Sin cambios',
+        message: 'No hay resultados nuevos para guardar.',
+        btnPrimaryText: 'Entendido',
+        btnPrimaryClass: 'btn btn-primary'
+      });
+      isSaving = false;
       btn.disabled = false;
       return;
     }
     
-    const batch = writeBatch(db);
-    
-    // 1. Crear partidos de grupos
-    const partidosGrupos = generarPartidosGrupos();
-    for (const p of partidosGrupos) {
-      const ref = doc(db, 'partidos_grupos', p.id);
-      batch.set(ref, {
-        grupo: p.grupo,
-        equipo1: p.equipo1,
-        equipo2: p.equipo2,
-        goles_equipo1: null,
-        goles_equipo2: null,
-        jugado: false,
-        fecha: p.fecha
-      });
-    }
-    
-    // 2. Crear partidos de fase final
-    const partidosFinal = generarPartidosFinal();
-    for (const p of partidosFinal) {
-      const ref = doc(db, 'partidos_final', p.id);
-      batch.set(ref, {
-        ronda: p.ronda,
-        numero: p.numero,
-        equipo1: p.equipo1,
-        equipo2: p.equipo2,
-        goles_equipo1: null,
-        goles_equipo2: null,
-        penales_equipo1: null,
-        penales_equipo2: null,
-        jugado: false,
-        ganador: null
-      });
-    }
-    
-    // 3. Crear documento de config
-    const configRef = doc(db, 'config', 'app_config');
-    batch.set(configRef, {
-      fase_actual: 'grupos',
-      fase_final_habilitada: false,
-      creado: new Date().toISOString()
-    });
-    
     await batch.commit();
     
-    showAlert(`✅ Base de datos inicializada: ${partidosGrupos.length} partidos de grupos + ${partidosFinal.length} partidos de final`, 'success');
-    status.innerHTML = `<span style="color: #4caf50;">✅ ${partidosGrupos.length} partidos de grupos y ${partidosFinal.length} de final cargados.</span>`;
+    // Recalcular puntos automáticamente
+    showToast('Info', 'Recalculando puntos de todos los participantes...', 'info', 3000);
+    await recalcularTodosLosPuntos();
     
-    // Recargar las listas
-    cargarPartidosGrupos();
-    cargarPartidosFinal();
+    // Actualizar visualización
+    renderizarRondaActual();
+    actualizarUI();
     
-  } catch (err) {
-    console.error(err);
-    showAlert('Error inicializando base de datos: ' + err.message, 'danger');
-    status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-// Resetear Base de Datos (borrar todo)
-document.getElementById('btn-reset-db').addEventListener('click', async () => {
-  if (!confirm('⚠️ ¿ESTÁS SEGURO?\n\nEsto borrará TODOS los partidos, resultados, predicciones y configuraciones.\n\nLos usuarios registrados NO se borrarán.\n\n¿Deseas continuar?')) {
-    return;
-  }
-  
-  const btn = document.getElementById('btn-reset-db');
-  const status = document.getElementById('init-status');
-  btn.disabled = true;
-  status.textContent = 'Borrando datos...';
-  
-  try {
-    // Borrar partidos de grupos
-    const gruposSnap = await getDocs(collection(db, 'partidos_grupos'));
-    for (const d of gruposSnap.docs) {
-      await deleteDoc(doc(db, 'partidos_grupos', d.id));
-    }
-    
-    // Borrar partidos de final
-    const finalSnap = await getDocs(collection(db, 'partidos_final'));
-    for (const d of finalSnap.docs) {
-      await deleteDoc(doc(db, 'partidos_final', d.id));
-    }
-    
-    // Borrar predicciones de grupos
-    const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
-    for (const d of predsGruposSnap.docs) {
-      await deleteDoc(doc(db, 'predicciones_grupos', d.id));
-    }
-    
-    // Borrar predicciones de final
-    const predsFinalSnap = await getDocs(collection(db, 'predicciones_final'));
-    for (const d of predsFinalSnap.docs) {
-      await deleteDoc(doc(db, 'predicciones_final', d.id));
-    }
-    
-    // Borrar config
-    await deleteDoc(doc(db, 'config', 'app_config'));
-    
-    showAlert('✅ Base de datos reiniciada. Ahora puedes cargar los partidos de nuevo.', 'success');
-    status.innerHTML = '<span style="color: #4caf50;">✅ Todo reiniciado. Presiona "🚀 Cargar Partidos" para empezar de nuevo.</span>';
-    
-    // Limpiar vistas
-    document.getElementById('admin-grupos-container').innerHTML = '';
-    document.getElementById('admin-final-container').innerHTML = '';
-    
-  } catch (err) {
-    console.error(err);
-    showAlert('Error reiniciando: ' + err.message, 'danger');
-    status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-// ========== GESTIÓN DE USUARIOS ==========
-
-let currentSearchUser = null;
-
-// Buscar usuarios
-document.getElementById('btn-search-user').addEventListener('click', async () => {
-  const cedula = document.getElementById('search-cedula').value.trim();
-  const alias = document.getElementById('search-alias').value.trim();
-  const resultsDiv = document.getElementById('users-search-results');
-  
-  if (!cedula && !alias) {
-    showAlert('Ingresa cédula o alias para buscar', 'danger');
-    return;
-  }
-  
-  resultsDiv.innerHTML = '<div class="spinner"></div>';
-  
-  try {
-    let usuarios = [];
-    
-    if (cedula) {
-      // Buscar por cédula exacta
-      const q = query(collection(db, 'users'), where('cedula', '==', cedula));
-      const snap = await getDocs(q);
-      snap.forEach(d => usuarios.push({ id: d.id, ...d.data() }));
-    } else if (alias) {
-      // Buscar por alias (case-insensitive aproximado)
-      const q = query(collection(db, 'users'));
-      const snap = await getDocs(q);
-      snap.forEach(d => {
-        const data = d.data();
-        if (data.alias.toLowerCase().includes(alias.toLowerCase())) {
-          usuarios.push({ id: d.id, ...data });
-        }
-      });
-    }
-    
-    if (usuarios.length === 0) {
-      resultsDiv.innerHTML = '<p style="color: var(--text-muted);">No se encontraron usuarios</p>';
-      return;
-    }
-    
-    // Mostrar tabla
-    let html = `
-      <table class="ranking-table" style="width:100%; margin-top: 15px;">
-        <thead>
-          <tr>
-            <th>Cédula</th>
-            <th>Alias</th>
-            <th>Pts Grupos</th>
-            <th>Pts Final</th>
-            <th>Pts Total</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-    
-    for (const u of usuarios) {
-      html += `
-        <tr>
-          <td>${u.cedula}</td>
-          <td>${u.alias}</td>
-          <td>${u.puntos_fase_grupos || 0}</td>
-          <td>${u.puntos_fase_final || 0}</td>
-          <td style="font-weight:bold; color:var(--accent);">${u.puntos_total || 0}</td>
-          <td>
-            <button class="btn btn-info" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 5px;" onclick="window.verPrediccionesUsuario('${u.cedula}', '${u.alias}')">📋 Ver Predicciones</button>
-            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.eliminarUsuario('${u.cedula}', '${u.alias}')">🗑️ Eliminar</button>
-          </td>
-        </tr>
-      `;
-    }
-    
-    html += '</tbody></table>';
-    resultsDiv.innerHTML = html;
-    
-  } catch (err) {
-    console.error(err);
-    resultsDiv.innerHTML = '<p style="color: var(--danger);">Error buscando usuarios</p>';
-  }
-});
-
-// Ver predicciones de un usuario
-window.verPrediccionesUsuario = async (cedula, alias) => {
-  currentSearchUser = { cedula, alias };
-  const container = document.getElementById('user-predictions-container');
-  const section = document.getElementById('user-predictions-section');
-  
-  container.innerHTML = '<div class="spinner"></div>';
-  section.style.display = 'block';
-  
-  try {
-    const userId = `${cedula}_${alias}`;
-    
-    // Obtener predicciones de grupos
-    const predsGruposQ = query(collection(db, 'predicciones_grupos'), where('user_id', '==', userId));
-    const predsGruposSnap = await getDocs(predsGruposQ);
-    const predsGrupos = [];
-    predsGruposSnap.forEach(d => predsGrupos.push(d.data()));
-    
-    // Obtener predicciones de final
-    const predsFinalQ = query(collection(db, 'predicciones_final'), where('user_id', '==', userId));
-    const predsFinalSnap = await getDocs(predsFinalQ);
-    const predsFinal = [];
-    predsFinalSnap.forEach(d => predsFinal.push(d.data()));
-    
-    if (predsGrupos.length === 0 && predsFinal.length === 0) {
-      container.innerHTML = '<p style="color: var(--text-muted);">Este usuario no tiene predicciones registradas</p>';
-      return;
-    }
-    
-    let html = `<h5 style="color: var(--accent); margin: 20px 0 10px;">Usuario: ${alias} (${cedula})</h5>`;
-    
-    // Fase de Grupos
-    if (predsGrupos.length > 0) {
-      html += '<h6 style="color: var(--text-secondary); margin: 15px 0 10px;">⚽ Fase de Grupos</h6>';
-      html += '<table class="ranking-table" style="width:100%;"><thead><tr><th>Partido</th><th>Predicción</th><th>Acciones</th></tr></thead><tbody>';
-      
-      for (const p of predsGrupos) {
-        html += `
-          <tr>
-            <td>${p.partido_id}</td>
-            <td style="font-weight:bold;">${p.prediccion_equipo1} - ${p.prediccion_equipo2}</td>
-            <td>
-              <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="window.borrarPrediccion('${cedula}', '${alias}', '${p.partido_id}', 'grupos')">🗑️ Borrar</button>
-            </td>
-          </tr>
-        `;
-      }
-      html += '</tbody></table>';
-    }
-    
-    // Fase Final
-    if (predsFinal.length > 0) {
-      html += '<h6 style="color: var(--text-secondary); margin: 15px 0 10px;">🏆 Fase Final</h6>';
-      html += '<table class="ranking-table" style="width:100%;"><thead><tr><th>Partido</th><th>Predicción</th><th>Penales</th><th>Ganador</th><th>Acciones</th></tr></thead><tbody>';
-      
-      for (const p of predsFinal) {
-        html += `
-          <tr>
-            <td>${p.partido_id}</td>
-            <td style="font-weight:bold;">${p.prediccion_equipo1} - ${p.prediccion_equipo2}</td>
-            <td>${p.prediccion_penales_equipo1 ?? '-'} - ${p.prediccion_penales_equipo2 ?? '-'}</td>
-            <td>${p.prediccion_ganador ?? '-'}</td>
-            <td>
-              <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="window.borrarPrediccion('${cedula}', '${alias}', '${p.partido_id}', 'final')">🗑️ Borrar</button>
-            </td>
-          </tr>
-        `;
-      }
-      html += '</tbody></table>';
-    }
-    
-    container.innerHTML = html;
-    
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = '<p style="color: var(--danger);">Error cargando predicciones</p>';
-  }
-};
-
-// Borrar predicción individual
-window.borrarPrediccion = async (cedula, alias, partidoId, tipo) => {
-  if (!confirm(`¿Eliminar predicción de ${alias} para el partido ${partidoId}?`)) return;
-  
-  try {
-    const docId = `${cedula}_${alias}_${partidoId}`;
-    const coleccion = tipo === 'grupos' ? 'predicciones_grupos' : 'predicciones_final';
-    await deleteDoc(doc(db, coleccion, docId));
-    
-    showAlert('Predicción eliminada', 'success');
-    // Recargar vista
-    window.verPrediccionesUsuario(cedula, alias);
-    
-  } catch (err) {
-    console.error(err);
-    showAlert('Error eliminando predicción', 'danger');
-  }
-};
-
-// Eliminar usuario completo
-window.eliminarUsuario = async (cedula, alias) => {
-  if (!confirm(`⚠️ ¿ESTÁS SEGURO?\n\nSe eliminará permanentemente:\n- Usuario: ${alias}\n- Cédula: ${cedula}\n- TODAS sus predicciones\n- TODOS sus puntos\n\nEsta acción NO se puede deshacer.\n\n¿Deseas continuar?`)) {
-    return;
-  }
-  
-  try {
-    const userId = `${cedula}_${alias}`;
-    
-    // 1. Borrar predicciones de grupos
-    const predsGruposQ = query(collection(db, 'predicciones_grupos'), where('user_id', '==', userId));
-    const predsGruposSnap = await getDocs(predsGruposQ);
-    for (const d of predsGruposSnap.docs) {
-      await deleteDoc(doc(db, 'predicciones_grupos', d.id));
-    }
-    
-    // 2. Borrar predicciones de final
-    const predsFinalQ = query(collection(db, 'predicciones_final'), where('user_id', '==', userId));
-    const predsFinalSnap = await getDocs(predsFinalQ);
-    for (const d of predsFinalSnap.docs) {
-      await deleteDoc(doc(db, 'predicciones_final', d.id));
-    }
-    
-    // 3. Borrar usuario
-    await deleteDoc(doc(db, 'users', userId));
-    
-    showAlert(`✅ Usuario ${alias} eliminado completamente`, 'success');
-    
-    // Limpiar resultados
-    document.getElementById('users-search-results').innerHTML = '';
-    document.getElementById('user-predictions-section').style.display = 'none';
-    
-  } catch (err) {
-    console.error(err);
-    showAlert('Error eliminando usuario: ' + err.message, 'danger');
-  }
-};
-
-// ========== GENERAR FASE FINAL AUTOMÁTICAMENTE ==========
-
-document.getElementById('btn-generar-fase-final').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-generar-fase-final');
-  const status = document.getElementById('generar-status');
-  const previewTabla = document.getElementById('tabla-grupos-preview');
-  const previewTerceros = document.getElementById('mejores-terceros-preview');
-  
-  btn.disabled = true;
-  status.textContent = 'Calculando clasificación...';
-  
-  try {
-    // 1. Obtener todos los partidos de grupos
-    const partidosSnap = await getDocs(collection(db, 'partidos_grupos'));
-    const partidosPorGrupo = {};
-    partidosSnap.forEach(d => {
-      const data = d.data();
-      if (!partidosPorGrupo[data.grupo]) partidosPorGrupo[data.grupo] = [];
-      partidosPorGrupo[data.grupo].push({ id: d.id, ...data });
+    showModal({
+      icon: '✅',
+      title: '¡Guardado Exitoso!',
+      message: `Se guardaron los resultados de <b>${count} partidos</b> de ${NOMBRES_RONDAS[ronda]}.<br><br>✅ Los puntos de todos los participantes han sido recalculados.`,
+      btnPrimaryText: 'Continuar',
+      btnPrimaryClass: 'btn btn-success'
     });
     
-    // 2. Calcular tabla de cada grupo
-    const posicionesGrupos = {};
-    const terceros = [];
-    let previewHtml = '<h4 style="color: var(--accent); margin-bottom: 15px;">📊 Tabla de Grupos</h4>';
-    previewHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">';
-    
-    for (const [grupo, partidos] of Object.entries(partidosPorGrupo)) {
-      // Verificar que todos los partidos del grupo estén jugados
-      const todosJugados = partidos.every(p => p.jugado && p.goles_equipo1 !== null && p.goles_equipo2 !== null);
-      if (!todosJugados) {
-        throw new Error(`El grupo ${grupo} no tiene todos los partidos jugados. Ingresa todos los resultados primero.`);
-      }
-      
-      const equipos = GRUPOS[grupo];
-      const tabla = calcularTablaGrupo(partidos, equipos);
-      posicionesGrupos[grupo] = tabla.map(t => t.equipo);
-      
-      // Guardar tercero
-      if (tabla[2]) {
-        terceros.push({
-          equipo: tabla[2].equipo,
-          grupo: grupo,
-          pts: tabla[2].pts,
-          dif: tabla[2].gf - tabla[2].gc,
-          gf: tabla[2].gf
-        });
-      }
-      
-      // Previsualización
-      previewHtml += `
-        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-          <h5 style="color: var(--accent); margin-bottom: 10px;">Grupo ${grupo}</h5>
-          <table style="width:100%; font-size: 0.85rem;">
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <th style="text-align:left; padding: 4px;">Pos</th>
-              <th style="text-align:left; padding: 4px;">Equipo</th>
-              <th style="text-align:center; padding: 4px;">Pts</th>
-              <th style="text-align:center; padding: 4px;">Dif</th>
-            </tr>
-      `;
-      tabla.forEach((t, idx) => {
-        const posColor = idx === 0 ? 'color: gold;' : idx === 1 ? 'color: silver;' : idx === 2 ? 'color: #cd7f32;' : '';
-        previewHtml += `
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <td style="padding: 4px; ${posColor} font-weight: bold;">${idx + 1}</td>
-            <td style="padding: 4px;">${t.equipo}</td>
-            <td style="text-align:center; padding: 4px;">${t.pts}</td>
-            <td style="text-align:center; padding: 4px;">${t.gf - t.gc}</td>
-          </tr>
-        `;
-      });
-      previewHtml += '</table></div>';
-    }
-    previewHtml += '</div>';
-    previewTabla.innerHTML = previewHtml;
-    previewTabla.style.display = 'block';
-    
-    // 3. Seleccionar 8 mejores terceros
-    const mejores8 = seleccionarMejoresTerceros(terceros);
-    
-    let tercerosHtml = '<h4 style="color: var(--accent); margin: 20px 0 15px;">🥉 8 Mejores Terceros (Clasificados)</h4>';
-    tercerosHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
-    mejores8.forEach((t, idx) => {
-      tercerosHtml += `
-        <div style="background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; padding: 10px; border-radius: 8px;">
-          <strong style="color: #4caf50;">#${idx + 1}</strong> ${t.equipo} <span style="color: var(--text-muted); font-size: 0.8rem;">(Grupo ${t.grupo}, ${t.pts}pts, Dif ${t.dif})</span>
-        </div>
-      `;
-    });
-    // Mostrar los que NO clasificaron
-    const noClasificados = terceros.filter(t => !mejores8.includes(t));
-    if (noClasificados.length > 0) {
-      tercerosHtml += '</div><h5 style="color: var(--text-muted); margin: 15px 0 10px;">❌ Terceros No Clasificados</h5>';
-      tercerosHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
-      noClasificados.forEach(t => {
-        tercerosHtml += `
-          <div style="background: rgba(244, 67, 54, 0.2); border: 1px solid var(--danger); padding: 10px; border-radius: 8px;">
-            <strong style="color: var(--danger);">✗</strong> ${t.equipo} <span style="color: var(--text-muted); font-size: 0.8rem;">(Grupo ${t.grupo}, ${t.pts}pts, Dif ${t.dif})</span>
-          </div>
-        `;
-      });
-    }
-    tercerosHtml += '</div>';
-    previewTerceros.innerHTML = tercerosHtml;
-    previewTerceros.style.display = 'block';
-    
-    // 4. Actualizar partidos de 16avos en Firestore
-    const batch = writeBatch(db);
-    const partidosFinalSnap = await getDocs(collection(db, 'partidos_final'));
-    const partidosFinal = [];
-    partidosFinalSnap.forEach(d => partidosFinal.push({ id: d.id, ...d.data() }));
-    
-    // Solo actualizar los 16 primeros (dieciseisavos)
-    const dieciseisavos = partidosFinal.filter(p => p.ronda === 'dieciseisavos').sort((a, b) => a.numero - b.numero);
-    
-    if (dieciseisavos.length !== 16) {
-      throw new Error(`Se esperaban 16 partidos de dieciseisavos, pero hay ${dieciseisavos.length}. Reinicia la base de datos.`);
-    }
-    
-    for (const p of dieciseisavos) {
-      const eq1 = placeholderToEquipo(p.equipo1, posicionesGrupos);
-      const eq2 = placeholderToEquipo(p.equipo2, posicionesGrupos);
-      
-      const ref = doc(db, 'partidos_final', p.id);
-      batch.update(ref, {
-        equipo1: eq1,
-        equipo2: eq2
-      });
-    }
-    
-    await batch.commit();
-    
-    showAlert('✅ Fase final generada correctamente. Revisa la previsualización y luego habilita la fase final.', 'success');
-    status.innerHTML = '<span style="color: #4caf50;">✅ 16 partidos de dieciseisavos actualizados con equipos reales. Ahora puedes habilitar la fase final para que los usuarios predigan.</span>';
-    
-    // Recargar la vista de resultados de fase final
-    cargarPartidosFinal();
-    
   } catch (err) {
     console.error(err);
-    showAlert('Error generando fase final: ' + err.message, 'danger');
-    status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
+    showToast('Error', 'Error al guardar: ' + err.message, 'error');
   } finally {
+    isSaving = false;
     btn.disabled = false;
+    actualizarEstadoBotonGuardar();
   }
-});
+}
 
-// Init
-cargarConfig();
-cargarPartidosGrupos();
-cargarPartidosFinal();
+function mostrarResumenFinal() {
+  let html = '<div style="text-align:center;">';
+  html += '<h3 style="color: var(--accent); margin-bottom: 20px;">📊 Resumen de Fase Final</h3>';
+  
+  for (const ronda of RONDAS) {
+    const partidos = partidosFinalPorRonda[ronda] || [];
+    const jugados = partidos.filter(p => resultadosFinal[p.id]?.jugado).length;
+    const total = partidos.length;
+    const icono = jugados === total ? '✅' : jugados > 0 ? '⚠️' : '❌';
+    html += `<div style="padding: 10px; margin: 8px 0; background: rgba(255,255,255,0.05); border-radius: 8px;">
+      <span style="font-size:1.2rem; margin-right:10px;">${icono}</span>
+      <b>${NOMBRES_RONDAS[ronda]}</b>: ${jugados}/${total} partidos jugados
+    </div>`;
+  }
+  
+  html += '</div>';
+  
+  showModal({
+    icon: '🏆',
+    title: 'Resumen de Fase Final',
+    message: html,
+    btnPrimaryText: 'Entendido',
+    btnPrimaryClass: 'btn btn-primary',
+    onPrimary: () => irARonda(RONDAS.length - 1)
+  });
+}
+
+// ===== INICIALIZACIÓN =====
+async function init() {
+  await checkFaseFinalHabilitada();
+  await cargarPartidosGrupos();
+  await cargarPartidosFinal();
+}
+
+init();
