@@ -1616,13 +1616,176 @@ document.getElementById('btn-generar-fase-final').addEventListener('click', asyn
   }
 });
 
-// ===== INICIALIZACIÓN =====
-async function init() {
-  await checkFaseFinalHabilitada();
-  await cargarInstitucionesAdmin();
-  await cargarPartidosGrupos();
-  await cargarPartidosFinal();
-}
+// ===== EXPORTAR TODO A PDF (ZIP) =====
+document.getElementById('btn-export-all-pdf').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export-all-pdf');
+  const status = document.getElementById('export-status');
+  
+  if (!confirm('¿Deseas generar el respaldo de todos los usuarios? Este proceso puede tardar unos segundos.')) return;
+  
+  btn.disabled = true;
+  status.textContent = '🔄 Iniciando exportación...';
+  
+  try {
+    const { jsPDF } = window.jspdf;
+    const zip = new JSZip();
+    
+    // 1. Obtener datos necesarios
+    status.textContent = '📥 Cargando datos de usuarios...';
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const usuarios = [];
+    usersSnap.forEach(d => usuarios.push({ id: d.id, ...d.data() }));
+    
+    if (usuarios.length === 0) {
+      throw new Error('No hay usuarios registrados.');
+    }
+    
+    status.textContent = '📥 Cargando todas las predicciones...';
+    const [predsGruposSnap, predsFinalSnap] = await Promise.all([
+      getDocs(collection(db, 'predicciones_grupos')),
+      getDocs(collection(db, 'predicciones_final'))
+    ]);
+    
+    const allPredsGrupos = {};
+    predsGruposSnap.forEach(d => {
+      const data = d.data();
+      if (!allPredsGrupos[data.user_id]) allPredsGrupos[data.user_id] = [];
+      allPredsGrupos[data.user_id].push(data);
+    });
+    
+    const allPredsFinal = {};
+    predsFinalSnap.forEach(d => {
+      const data = d.data();
+      if (!allPredsFinal[data.user_id]) allPredsFinal[data.user_id] = [];
+      allPredsFinal[data.user_id].push(data);
+    });
+    
+    status.textContent = '📄 Generando PDFs... (0/' + usuarios.length + ')';
+    
+    for (let i = 0; i < usuarios.length; i++) {
+      const u = usuarios[i];
+      status.textContent = `📄 Generando PDFs... (${i + 1}/${usuarios.length})`;
+      
+      const docPdf = new jsPDF();
+      let y = 20;
+      
+      // Encabezado
+      docPdf.setFontSize(18);
+      docPdf.setTextColor(0, 102, 51);
+      docPdf.text('POLLA MUNDIALISTA 2026', 105, y, { align: 'center' });
+      y += 10;
+      
+      docPdf.setFontSize(14);
+      docPdf.setTextColor(0, 0, 0);
+      docPdf.text(`Respaldo de Predicciones`, 105, y, { align: 'center' });
+      y += 15;
+      
+      // Datos Usuario
+      docPdf.setFontSize(11);
+      docPdf.setFont(undefined, 'bold');
+      docPdf.text('DATOS DEL PARTICIPANTE:', 20, y);
+      y += 7;
+      docPdf.setFont(undefined, 'normal');
+      docPdf.text(`Nombre / Alias: ${u.alias}`, 20, y);
+      y += 6;
+      docPdf.text(`Cédula: ${u.cedula}`, 20, y);
+      y += 6;
+      docPdf.text(`Institución: ${u.institucion_activa || 'No definida'}`, 20, y);
+      y += 15;
+      
+      // FASE DE GRUPOS
+      docPdf.setFontSize(12);
+      docPdf.setFont(undefined, 'bold');
+      docPdf.setTextColor(168, 213, 186);
+      docPdf.rect(20, y - 5, 170, 7, 'F');
+      docPdf.setTextColor(0, 0, 0);
+      docPdf.text('ETAPA 1: FASE DE GRUPOS', 25, y);
+      y += 10;
+      
+      const predsU = allPredsGrupos[u.id] || [];
+      if (predsU.length === 0) {
+        docPdf.setFont(undefined, 'italic');
+        docPdf.text('No hay predicciones registradas para esta fase.', 25, y);
+        y += 10;
+      } else {
+        docPdf.setFontSize(9);
+        docPdf.setFont(undefined, 'bold');
+        docPdf.text('PARTIDO', 25, y);
+        docPdf.text('PREDICCIÓN', 120, y);
+        y += 5;
+        docPdf.line(25, y, 180, y);
+        y += 7;
+        
+        docPdf.setFont(undefined, 'normal');
+        predsU.sort((a,b) => a.partido_id.localeCompare(b.partido_id)).forEach(p => {
+          if (y > 270) { docPdf.addPage(); y = 20; }
+          docPdf.text(p.partido_id, 25, y);
+          docPdf.text(`${p.prediccion_equipo1} - ${p.prediccion_equipo2}`, 120, y);
+          y += 6;
+        });
+        y += 5;
+      }
+      
+      // FASE FINAL
+      if (y > 240) { docPdf.addPage(); y = 20; }
+      y += 10;
+      docPdf.setFontSize(12);
+      docPdf.setFont(undefined, 'bold');
+      docPdf.setTextColor(232, 197, 71);
+      docPdf.rect(20, y - 5, 170, 7, 'F');
+      docPdf.setTextColor(0, 0, 0);
+      docPdf.text('ETAPA 2: FASE FINAL', 25, y);
+      y += 10;
+      
+      const predsF = allPredsFinal[u.id] || [];
+      if (predsF.length === 0) {
+        docPdf.setFont(undefined, 'italic');
+        docPdf.text('No hay predicciones registradas para esta fase.', 25, y);
+        y += 10;
+      } else {
+        docPdf.setFontSize(9);
+        docPdf.setFont(undefined, 'bold');
+        docPdf.text('RONDA / PARTIDO', 25, y);
+        docPdf.text('MARCADOR', 100, y);
+        docPdf.text('GANADOR', 140, y);
+        y += 5;
+        docPdf.line(25, y, 180, y);
+        y += 7;
+        
+        docPdf.setFont(undefined, 'normal');
+        predsF.sort((a,b) => a.partido_id.localeCompare(b.partido_id)).forEach(p => {
+          if (y > 270) { docPdf.addPage(); y = 20; }
+          docPdf.text(p.partido_id, 25, y);
+          docPdf.text(`${p.prediccion_equipo1} - ${p.prediccion_equipo2}`, 100, y);
+          docPdf.text(p.prediccion_ganador || '-', 140, y);
+          y += 6;
+        });
+      }
+      
+      const pdfBlob = docPdf.output('blob');
+      const filename = `${u.cedula}_${u.alias.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      zip.file(filename, pdfBlob);
+    }
+    
+    status.textContent = '📦 Empaquetando ZIP...';
+    const content = await zip.generateAsync({ type: 'blob' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(content);
+    link.download = `Respaldo_Polla_2026_${new Date().toISOString().split('T')[0]}.zip`;
+    link.click();
+    
+    status.textContent = '✅ ¡Exportación completada!';
+    showToast('Éxito', 'Respaldo generado con éxito', 'success');
+    
+  } catch (err) {
+    console.error(err);
+    status.textContent = '❌ Error en la exportación';
+    showToast('Error', 'No se pudo generar el respaldo: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // ===== EVENT LISTENERS PARA BOTONES DE INICIALIZACIÓN =====
 document.getElementById('btn-init-db').addEventListener('click', async () => {
