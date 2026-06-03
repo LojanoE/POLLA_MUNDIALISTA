@@ -115,7 +115,7 @@ All JS files are ES modules using `import` with:
 Pages reference scripts with `<script type="module" src="...">`.
 
 ## Cache busting / versioning
-All CSS and JS references use `?v=7.1` query parameters to force browser refresh during testing. Bump this version (e.g., `?v=7.1` → `?v=7.2`) when making major structural changes to ensure users get the latest files without hard-refreshing.
+All CSS and JS references use `?v=7.2` query parameters to force browser refresh during testing. Bump this version (e.g., `?v=7.2` → `?v=7.2`) when making major structural changes to ensure users get the latest files without hard-refreshing.
 
 ## What not to add
 - Do NOT add a build tool, bundler, or framework unless explicitly requested.
