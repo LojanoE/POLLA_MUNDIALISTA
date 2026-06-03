@@ -1640,10 +1640,12 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
       throw new Error('No hay usuarios registrados.');
     }
     
-    status.textContent = '📥 Cargando todas las predicciones...';
-    const [predsGruposSnap, predsFinalSnap] = await Promise.all([
+    status.textContent = '📥 Cargando todas las predicciones y partidos...';
+    const [predsGruposSnap, predsFinalSnap, partidosGruposSnap, partidosFinalSnap] = await Promise.all([
       getDocs(collection(db, 'predicciones_grupos')),
-      getDocs(collection(db, 'predicciones_final'))
+      getDocs(collection(db, 'predicciones_final')),
+      getDocs(collection(db, 'partidos_grupos')),
+      getDocs(collection(db, 'partidos_final'))
     ]);
     
     const allPredsGrupos = {};
@@ -1658,6 +1660,17 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
       const data = d.data();
       if (!allPredsFinal[data.user_id]) allPredsFinal[data.user_id] = [];
       allPredsFinal[data.user_id].push(data);
+    });
+    
+    // Mapas de partidos para mostrar nombres de equipos en el PDF
+    const partidosGruposMap = {};
+    partidosGruposSnap.forEach(d => {
+      partidosGruposMap[d.id] = d.data();
+    });
+    
+    const partidosFinalMap = {};
+    partidosFinalSnap.forEach(d => {
+      partidosFinalMap[d.id] = d.data();
     });
     
     status.textContent = '📄 Generando PDFs... (0/' + usuarios.length + ')';
@@ -1719,7 +1732,10 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
         docPdf.setFont(undefined, 'normal');
         predsU.sort((a,b) => a.partido_id.localeCompare(b.partido_id)).forEach(p => {
           if (y > 270) { docPdf.addPage(); y = 20; }
-          docPdf.text(p.partido_id, 25, y);
+          const partidoReal = partidosGruposMap[p.partido_id];
+          const eq1 = partidoReal ? partidoReal.equipo1 : '?';
+          const eq2 = partidoReal ? partidoReal.equipo2 : '?';
+          docPdf.text(`${p.partido_id}: ${eq1} vs ${eq2}`, 25, y);
           docPdf.text(`${p.prediccion_equipo1} - ${p.prediccion_equipo2}`, 120, y);
           y += 6;
         });
@@ -1755,7 +1771,10 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
         docPdf.setFont(undefined, 'normal');
         predsF.sort((a,b) => a.partido_id.localeCompare(b.partido_id)).forEach(p => {
           if (y > 270) { docPdf.addPage(); y = 20; }
-          docPdf.text(p.partido_id, 25, y);
+          const partidoReal = partidosFinalMap[p.partido_id];
+          const eq1 = partidoReal ? partidoReal.equipo1 : '?';
+          const eq2 = partidoReal ? partidoReal.equipo2 : '?';
+          docPdf.text(`${p.partido_id}: ${eq1} vs ${eq2}`, 25, y);
           docPdf.text(`${p.prediccion_equipo1} - ${p.prediccion_equipo2}`, 100, y);
           docPdf.text(p.prediccion_ganador || '-', 140, y);
           y += 6;
@@ -2180,3 +2199,13 @@ window.eliminarUsuario = async (cedula, alias) => {
     showToast('Error', 'Error eliminando usuario', 'error');
   }
 };
+
+// ===== INICIALIZACIÓN =====
+async function init() {
+  await checkFaseFinalHabilitada();
+  await cargarInstitucionesAdmin();
+  await cargarPartidosGrupos();
+  await cargarPartidosFinal();
+}
+
+init();
