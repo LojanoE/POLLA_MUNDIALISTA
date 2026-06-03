@@ -53,7 +53,7 @@ function showAlert(msg, type) {
 }
 
 function getFlagUrl(pais) {
-  if (!pais || pais.startsWith('Ganador') || pais.startsWith('Perdedor') || pais.startsWith('1') || pais.startsWith('2') || pais.startsWith('3')) {
+  if (!pais || pais.startsWith('Ganador') || pais.startsWith('Perdedor') || /^[123][A-L]$/.test(pais) || /^T[1-8]$/.test(pais)) {
     return null; // No hay bandera para placeholders
   }
   const code = BANDERAS[pais] || 'xx';
@@ -61,7 +61,7 @@ function getFlagUrl(pais) {
 }
 
 function esPlaceholder(equipo) {
-  return !equipo || equipo.startsWith('Ganador') || equipo.startsWith('Perdedor') || /^[123][A-L]$/.test(equipo);
+  return !equipo || equipo.startsWith('Ganador') || equipo.startsWith('Perdedor') || /^[123][A-L]$/.test(equipo) || /^T[1-8]$/.test(equipo);
 }
 
 // ===== VERIFICAR FASE FINAL HABILITADA =====

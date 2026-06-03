@@ -11,7 +11,7 @@ export const GRUPOS = {
   H: ["España", "Cabo Verde", "Arabia Saudí", "Uruguay"],
   I: ["Francia", "Senegal", "Irak", "Noruega"],
   J: ["Argentina", "Argelia", "Austria", "Jordania"],
-  K: ["Portugal", "Jamaica", "Uzbekistán", "Colombia"],
+  K: ["Portugal", "RD Congo", "Uzbekistán", "Colombia"],
   L: ["Inglaterra", "Croacia", "Ghana", "Panamá"]
 };
 
@@ -58,7 +58,7 @@ export const BANDERAS = {
   "Austria": "at",
   "Jordania": "jo",
   "Portugal": "pt",
-  "Jamaica": "jm",
+  "RD Congo": "cd",
   "Uzbekistán": "uz",
   "Colombia": "co",
   "Inglaterra": "gb-eng",
@@ -70,8 +70,7 @@ export const BANDERAS = {
 // Instituciones por defecto
 export function generarInstitucionesPorDefecto() {
   return [
-    { codigo: 'GDR', nombre: 'GDR' },
-    { codigo: 'MANTENIMIENTO', nombre: 'Mantenimiento' }
+    { codigo: 'GDR', nombre: 'GDR' }
   ];
 }
 
@@ -151,8 +150,19 @@ export function generarPartidosFinal() {
 }
 
 // Mapeo de posición en grupo a placeholder
-// Ej: 1A = primer lugar del grupo A
-export function placeholderToEquipo(placeholder, posicionesGrupos) {
+// Ej: 1A = primer lugar del grupo A, T1 = mejor tercero 1
+export function placeholderToEquipo(placeholder, posicionesGrupos, mejoresTerceros = []) {
+  if (!placeholder) return placeholder;
+
+  // Manejar mejores terceros (T1, T2, ... T8)
+  if (placeholder.startsWith('T') && placeholder.length <= 2) {
+    const idx = parseInt(placeholder.substring(1)) - 1;
+    if (mejoresTerceros && mejoresTerceros[idx]) {
+      return mejoresTerceros[idx].equipo;
+    }
+    return placeholder;
+  }
+
   // placeholder formato: "1A" (posición 1, grupo A)
   const pos = parseInt(placeholder[0]);
   const grupo = placeholder.substring(1);

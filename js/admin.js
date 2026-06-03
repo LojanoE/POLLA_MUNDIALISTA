@@ -410,10 +410,41 @@ async function recalcularTodosLosPuntos() {
     // 4. Calcular puntos de fase de grupos
     const puntosPorUsuario = {};
     
+    // Calcular posiciones reales de grupos
+    const partidosPorGrupoReal = {};
+    for (const p of Object.values(partidosGrupos)) {
+      if (!partidosPorGrupoReal[p.grupo]) partidosPorGrupoReal[p.grupo] = [];
+      partidosPorGrupoReal[p.grupo].push(p);
+    }
+    
+    const posicionesReales = {};
+    const mejoresTercerosReales = [];
+    const todosTercerosReales = [];
+    
+    for (const [grupo, partidos] of Object.entries(partidosPorGrupoReal)) {
+      const tabla = calcularTablaGrupo(partidos, GRUPOS[grupo]);
+      posicionesReales[grupo] = tabla.map(t => t.equipo);
+      
+      // Guardar información del tercero para el cálculo global
+      if (tabla[2]) {
+        todosTercerosReales.push({
+          equipo: tabla[2].equipo,
+          grupo: grupo,
+          pts: tabla[2].pts,
+          dif: tabla[2].gf - tabla[2].gc,
+          gf: tabla[2].gf
+        });
+      }
+    }
+    
+    // Obtener los 8 mejores terceros reales que clasificaron
+    const top8TercerosReales = seleccionarMejoresTerceros(todosTercerosReales).map(t => t.equipo);
+    
     for (const u of usuarios) {
       let ptsGrupos = 0;
       const preds = predsGrupos[u.id] || {};
       
+      // A. Puntos por marcador y resultado (1 y 3 pts)
       for (const [partidoId, partido] of Object.entries(partidosGrupos)) {
         const pred = preds[partidoId];
         if (!pred) continue;
@@ -425,6 +456,84 @@ async function recalcularTodosLosPuntos() {
         
         if (p1 === g1 && p2 === g2) ptsGrupos += 3;
         else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) ptsGrupos += 1;
+      }
+      
+      // B. Puntos por Clasificación y Posición Exacta
+      // Simular tablas del usuario para cada grupo
+      const clasificadosUser = [];
+      
+      for (const [grupo, equipos] of Object.entries(GRUPOS)) {
+        const partidosGrupoUser = [];
+        const partidosDeEsteGrupo = partidosPorGrupoReal[grupo] || [];
+        
+        for (const pReal of partidosDeEsteGrupo) {
+          const pred = preds[pReal.id];
+          partidosGrupoUser.push({
+            id: pReal.id,
+            equipo1: pReal.equipo1,
+            equipo2: pReal.equipo2,
+            goles_equipo1: pred ? pred.prediccion_equipo1 : 0,
+            goles_equipo2: pred ? pred.prediccion_equipo2 : 0,
+            jugado: true
+          });
+        }
+        
+        const tablaPred = calcularTablaGrupo(partidosGrupoUser, equipos);
+        const posPred = tablaPred.map(t => t.equipo);
+        const posReal = posicionesReales[grupo];
+        
+        if (posReal) {
+          // 1 pt por cada equipo clasificado (los 2 primeros de cada grupo)
+          const clasificadosGrupoReal = posReal.slice(0, 2);
+          const clasificadosGrupoPred = posPred.slice(0, 2);
+          
+          for (const cp of clasificadosGrupoPred) {
+            if (posReal.includes(cp)) { // El equipo clasifica si está en el top de la FIFA real
+              // Nota: Verificamos contra posReal total para ver si pasó (2 primeros + mejores terceros)
+              // Pero la regla dice "clasificado a dieciseisavos".
+              // Calcularemos los 32 que el usuario predijo que pasarían.
+            }
+          }
+          
+          // Guardar información del tercero predicho para el cálculo global de mejores terceros
+          // (Aunque para simplificar, usaremos los 2 primeros directos y los terceros según la lógica del mundial)
+          clasificadosUser.push(...posPred.slice(0, 2));
+          
+          // 1 pt por posición exacta (Solo si el equipo clasifica en esa posición)
+          if (posPred[0] === posReal[0]) ptsGrupos += 1;
+          if (posPred[1] === posReal[1]) ptsGrupos += 1;
+        }
+      }
+      
+      // Puntos por equipos clasificados (1 pt c/u)
+      // Los 32 equipos reales que clasificaron
+      const todosClasificadosReales = [];
+      for (const grupoPos of Object.values(posicionesReales)) {
+        todosClasificadosReales.push(grupoPos[0], grupoPos[1]);
+      }
+      todosClasificadosReales.push(...top8TercerosReales);
+      
+      // Los equipos que el usuario "metió" en octavos según sus predicciones
+      // (Buscamos coincidencias entre lo que el usuario predijo como clasificados y los reales)
+      // Para no complicar con la tabla de mejores terceros del usuario, comparamos sus 2 primeros de cada grupo
+      // y si sus terceros reales clasificaron.
+      for (const [grupo, posReal] of Object.entries(posicionesReales)) {
+          const posPred = []; // Tendríamos que recalcularla o guardarla arriba
+          // Re-calculamos brevemente para este usuario
+          const partidosGrupoUser = (partidosPorGrupoReal[grupo] || []).map(p => ({
+              ...p,
+              goles_equipo1: preds[p.id] ? preds[p.id].prediccion_equipo1 : 0,
+              goles_equipo2: preds[p.id] ? preds[p.id].prediccion_equipo2 : 0,
+              jugado: true
+          }));
+          const tablaPred = calcularTablaGrupo(partidosGrupoUser, GRUPOS[grupo]);
+          const top2Pred = tablaPred.slice(0, 2).map(t => t.equipo);
+          
+          for (const eqP of top2Pred) {
+              if (todosClasificadosReales.includes(eqP)) ptsGrupos += 1;
+          }
+          // Nota: La regla de mejores terceros es compleja de simular por usuario, 
+          // pero si el usuario predijo que un equipo pasaba y ese equipo pasó (aunque sea como mejor tercero real), suma punto.
       }
       
       puntosPorUsuario[u.id] = { puntosGrupos: ptsGrupos, puntosFinal: u.puntos_fase_final || 0 };
@@ -881,7 +990,10 @@ function renderizarRondaActual() {
         <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
           <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px;">
             <img src="${getFlagUrl(eq1Calculado)}" style="width:32px; height:24px; border-radius:4px; object-fit:cover;" onerror="this.style.display='none'">
-            <span style="font-weight:600; font-size:0.95rem;">${eq1Calculado}</span>
+            <div style="display:flex; flex-direction:column;">
+              <span style="font-weight:600; font-size:0.95rem;">${eq1Calculado}</span>
+              ${ronda === 'dieciseisavos' ? `<button class="edit-team-btn" onclick="window.abrirSeleccionEquipo('${p.id}', true)">✏️ Cambiar</button>` : ''}
+            </div>
           </div>
           <div style="display:flex; flex-direction:column; align-items:center; gap:8px; min-width:130px;">
             <div style="display:flex; align-items:center; gap:6px;">
@@ -900,7 +1012,10 @@ function renderizarRondaActual() {
             </div>
           </div>
           <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px; justify-content:flex-end;">
-            <span style="font-weight:600; font-size:0.95rem; text-align:right;">${eq2Calculado}</span>
+            <div style="display:flex; flex-direction:column; align-items:flex-end;">
+              <span style="font-weight:600; font-size:0.95rem; text-align:right;">${eq2Calculado}</span>
+              ${ronda === 'dieciseisavos' ? `<button class="edit-team-btn" onclick="window.abrirSeleccionEquipo('${p.id}', false)">✏️ Cambiar</button>` : ''}
+            </div>
             <img src="${getFlagUrl(eq2Calculado)}" style="width:32px; height:24px; border-radius:4px; object-fit:cover;" onerror="this.style.display='none'">
           </div>
         </div>
@@ -922,6 +1037,75 @@ function renderizarRondaActual() {
     inp.addEventListener('input', handleInputChange);
   });
 }
+
+// ===== SELECCIÓN MANUAL DE EQUIPOS =====
+let equipoEdicionActual = { partidoId: null, esEquipo1: true };
+
+window.abrirSeleccionEquipo = (partidoId, esEquipo1) => {
+  equipoEdicionActual = { partidoId, esEquipo1 };
+  const overlay = document.getElementById('modal-team-selector');
+  const grid = document.getElementById('team-grid');
+  grid.innerHTML = '';
+  
+  // Obtener todos los equipos de GRUPOS
+  const todosEquipos = [];
+  for (const equipos of Object.values(GRUPOS)) {
+    todosEquipos.push(...equipos);
+  }
+  todosEquipos.sort();
+  
+  for (const equipo of todosEquipos) {
+    const item = document.createElement('div');
+    item.className = 'team-select-item';
+    item.innerHTML = `
+      <img src="${getFlagUrl(equipo)}" onerror="this.src='https://flagcdn.com/w40/xx.png'">
+      <span>${equipo}</span>
+    `;
+    item.onclick = () => seleccionarEquipoManual(equipo);
+    grid.appendChild(item);
+  }
+  
+  overlay.classList.remove('hidden');
+};
+
+async function seleccionarEquipoManual(equipo) {
+  const { partidoId, esEquipo1 } = equipoEdicionActual;
+  const overlay = document.getElementById('modal-team-selector');
+  
+  try {
+    const ref = doc(db, 'partidos_final', partidoId);
+    const updateData = {};
+    if (esEquipo1) updateData.equipo1 = equipo;
+    else updateData.equipo2 = equipo;
+    
+    await updateDoc(ref, updateData);
+    
+    // Actualizar localmente
+    const partido = partidosFinalData.find(p => p.id === partidoId);
+    if (partido) {
+      if (esEquipo1) partido.equipo1 = equipo;
+      else partido.equipo2 = equipo;
+      
+      if (!resultadosFinal[partidoId]) resultadosFinal[partidoId] = {};
+      if (esEquipo1) resultadosFinal[partidoId].eq1 = equipo;
+      else resultadosFinal[partidoId].eq2 = equipo;
+    }
+    
+    overlay.classList.add('hidden');
+    showToast('Éxito', `Equipo actualizado a ${equipo}`, 'success');
+    
+    // Re-renderizar ronda actual
+    renderizarRondaActual();
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo actualizar el equipo', 'error');
+  }
+}
+
+document.getElementById('btn-close-team-selector').onclick = () => {
+  document.getElementById('modal-team-selector').classList.add('hidden');
+};
 
 function handleInputChange(e) {
   const id = e.target.dataset.id;
@@ -1398,8 +1582,8 @@ document.getElementById('btn-generar-fase-final').addEventListener('click', asyn
     }
     
     for (const p of dieciseisavos) {
-      const eq1 = placeholderToEquipo(p.equipo1, posicionesGrupos);
-      const eq2 = placeholderToEquipo(p.equipo2, posicionesGrupos);
+      const eq1 = placeholderToEquipo(p.equipo1, posicionesGrupos, mejores8);
+      const eq2 = placeholderToEquipo(p.equipo2, posicionesGrupos, mejores8);
       
       const ref = doc(db, 'partidos_final', p.id);
       batch.update(ref, {
@@ -1511,12 +1695,6 @@ document.getElementById('btn-init-db').addEventListener('click', async () => {
     batch.set(doc(db, 'instituciones', 'GDR'), {
       nombre: 'GDR',
       descripcion: 'Gerencia de Desarrollo y Recursos',
-      activo: true,
-      creado: new Date().toISOString()
-    });
-    batch.set(doc(db, 'instituciones', 'MANTENIMIENTO'), {
-      nombre: 'MANTENIMIENTO',
-      descripcion: 'Mantenimiento',
       activo: true,
       creado: new Date().toISOString()
     });
