@@ -440,6 +440,13 @@
         <input type="text" id="search-alias" placeholder="Buscar por alias..." style="padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); flex: 1; min-width: 200px;">
         <button id="btn-search-user" class="btn btn-primary" style="padding: 10px 20px;">🔍 Buscar</button>
       </div>
+
+      <div style="margin-bottom: 20px; padding: 15px; background: rgba(168, 213, 186, 0.1); border: 1px dashed var(--accent); border-radius: 12px; text-align: center;">
+        <p style="margin-bottom: 10px; font-size: 0.9rem; color: var(--text-muted);">Generar un archivo ZIP con todas las predicciones de todos los usuarios en formato PDF.</p>
+        <button id="btn-export-all-pdf" class="btn btn-success" style="padding: 10px 20px;">📥 Exportar Respaldo Completo (ZIP/PDF)</button>
+        <div id="export-status" style="margin-top: 10px; font-size: 0.85rem; color: var(--accent);"></div>
+      </div>
+
       <div id="users-search-results"></div>
       
       <div id="user-predictions-section" style="display: none; margin-top: 30px;">
