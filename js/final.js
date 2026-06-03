@@ -72,10 +72,12 @@ async function checkFaseFinal() {
     
     if (!configSnap.exists() || !configSnap.data().fase_final_habilitada) {
       document.getElementById('bloqueo-msg').style.display = 'block';
+      if (fabBracket) fabBracket.style.display = 'none';
       return false;
     }
     
     document.getElementById('final-content').style.display = 'block';
+    if (fabBracket) fabBracket.style.display = 'flex';
     return true;
   } catch (err) {
     console.error(err);
@@ -400,6 +402,11 @@ function handleInputChange(e) {
     
     // Actualizar tabs para mostrar rondas posteriores con datos
     actualizarTabsEstado();
+  }
+  
+  // Si el modal del bracket está abierto, actualizarlo en tiempo real
+  if (modalBracket && modalBracket.style.display === 'flex') {
+    renderizarBracketVisual();
   }
   
   actualizarBotonesGuardado();
@@ -776,6 +783,166 @@ function mostrarResumenFinal() {
     );
   }
 }
+
+// ===== BRACKET VISUAL (MODAL) =====
+
+const NEXT_MATCH_MAP = {
+  'F1': 'F17', 'F2': 'F17', 'F3': 'F18', 'F4': 'F18',
+  'F5': 'F19', 'F6': 'F19', 'F7': 'F20', 'F8': 'F20',
+  'F9': 'F21', 'F10': 'F21', 'F11': 'F22', 'F12': 'F22',
+  'F13': 'F23', 'F14': 'F23', 'F15': 'F24', 'F16': 'F24',
+  'F17': 'F25', 'F18': 'F25', 'F19': 'F26', 'F20': 'F26',
+  'F21': 'F27', 'F22': 'F27', 'F23': 'F28', 'F24': 'F28',
+  'F25': 'F29', 'F26': 'F29', 'F27': 'F30', 'F28': 'F30',
+  'F29': 'F32', 'F30': 'F32'
+};
+
+const LEFT_HALF_MATCHES = ['F1','F2','F3','F4','F5','F6','F7','F8','F17','F18','F19','F20','F25','F26','F29'];
+const RIGHT_HALF_MATCHES = ['F9','F10','F11','F12','F13','F14','F15','F16','F21','F22','F23','F24','F27','F28','F30'];
+
+function renderEquipoBracket(equipoNombre) {
+  const flagUrl = getFlagUrl(equipoNombre);
+  const esPh = esPlaceholder(equipoNombre);
+  const clase = esPh ? 'placeholder' : 'real';
+  
+  if (flagUrl) {
+    return `<div class="bracket-team ${clase}"><img src="${flagUrl}" alt="${equipoNombre}"><span>${equipoNombre}</span></div>`;
+  } else {
+    return `<div class="bracket-team ${clase}"><div class="placeholder-icon-bracket">?</div><span>${equipoNombre}</span></div>`;
+  }
+}
+
+function renderMatchBracket(partidoId) {
+  const eq1 = equiposCalculados[partidoId]?.eq1 || '?';
+  const eq2 = equiposCalculados[partidoId]?.eq2 || '?';
+  const nextId = NEXT_MATCH_MAP[partidoId];
+  const arrow = nextId ? `<span class="bracket-arrow">→ <span>${nextId}</span></span>` : '';
+  
+  return `
+    <div class="bracket-match">
+      <span class="bracket-match-id">${partidoId}</span>
+      ${renderEquipoBracket(eq1)}
+      <span class="bracket-vs">VS</span>
+      ${renderEquipoBracket(eq2)}
+      ${arrow}
+    </div>
+  `;
+}
+
+function renderRondaBracket(titulo, idsMatch) {
+  const matchesHtml = idsMatch.map(id => renderMatchBracket(id)).join('');
+  return `
+    <div class="bracket-round">
+      <div class="bracket-round-title">${titulo}</div>
+      ${matchesHtml}
+    </div>
+  `;
+}
+
+function renderizarBracketVisual() {
+  const container = document.getElementById('modal-bracket-body');
+  if (!container) return;
+  
+  const leftDieciseisavos = LEFT_HALF_MATCHES.filter(id => id.startsWith('F') && parseInt(id.substring(1)) <= 16);
+  const leftOctavos = LEFT_HALF_MATCHES.filter(id => {
+    const n = parseInt(id.substring(1));
+    return n >= 17 && n <= 20;
+  });
+  const leftCuartos = LEFT_HALF_MATCHES.filter(id => {
+    const n = parseInt(id.substring(1));
+    return n >= 25 && n <= 26;
+  });
+  const leftSemis = LEFT_HALF_MATCHES.filter(id => id === 'F29');
+  
+  const rightDieciseisavos = RIGHT_HALF_MATCHES.filter(id => id.startsWith('F') && parseInt(id.substring(1)) <= 16);
+  const rightOctavos = RIGHT_HALF_MATCHES.filter(id => {
+    const n = parseInt(id.substring(1));
+    return n >= 21 && n <= 24;
+  });
+  const rightCuartos = RIGHT_HALF_MATCHES.filter(id => {
+    const n = parseInt(id.substring(1));
+    return n >= 27 && n <= 28;
+  });
+  const rightSemis = RIGHT_HALF_MATCHES.filter(id => id === 'F30');
+  
+  const html = `
+    <div class="bracket-container">
+      <!-- MITAD IZQUIERDA -->
+      <div class="bracket-half">
+        <div class="bracket-half-title">🔼 Mitad Superior</div>
+        ${renderRondaBracket('Dieciseisavos de Final', leftDieciseisavos)}
+        ${renderRondaBracket('Octavos de Final', leftOctavos)}
+        ${renderRondaBracket('Cuartos de Final', leftCuartos)}
+        ${renderRondaBracket('Semifinal', leftSemis)}
+      </div>
+      
+      <!-- MITAD DERECHA -->
+      <div class="bracket-half">
+        <div class="bracket-half-title">🔽 Mitad Inferior</div>
+        ${renderRondaBracket('Dieciseisavos de Final', rightDieciseisavos)}
+        ${renderRondaBracket('Octavos de Final', rightOctavos)}
+        ${renderRondaBracket('Cuartos de Final', rightCuartos)}
+        ${renderRondaBracket('Semifinal', rightSemis)}
+      </div>
+      
+      <!-- FINAL Y TERCER LUGAR -->
+      <div class="bracket-final-section">
+        <div class="bracket-final-box">
+          <div class="bracket-round-title">🏆 La Gran Final</div>
+          ${renderMatchBracket('F32')}
+        </div>
+        <div class="bracket-final-box" style="border-color: #cd7f32;">
+          <div class="bracket-round-title" style="color: #cd7f32;">🥉 Tercer Lugar</div>
+          ${renderMatchBracket('F31')}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  container.innerHTML = html;
+}
+
+// ===== CONTROL DEL MODAL =====
+const modalBracket = document.getElementById('modal-bracket');
+const fabBracket = document.getElementById('fab-bracket');
+const btnCloseModal = document.getElementById('modal-bracket-close');
+const btnCloseModalFooter = document.getElementById('modal-bracket-close-btn');
+
+function abrirModalBracket() {
+  if (!modalBracket) return;
+  recalcularTodosEquipos();
+  renderizarBracketVisual();
+  modalBracket.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalBracket() {
+  if (!modalBracket) return;
+  modalBracket.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+if (fabBracket) {
+  fabBracket.addEventListener('click', abrirModalBracket);
+}
+if (btnCloseModal) {
+  btnCloseModal.addEventListener('click', cerrarModalBracket);
+}
+if (btnCloseModalFooter) {
+  btnCloseModalFooter.addEventListener('click', cerrarModalBracket);
+}
+if (modalBracket) {
+  modalBracket.addEventListener('click', (e) => {
+    if (e.target === modalBracket) cerrarModalBracket();
+  });
+}
+
+// Cerrar con ESC
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modalBracket && modalBracket.style.display === 'flex') {
+    cerrarModalBracket();
+  }
+});
 
 // ===== INIT =====
 cargarPartidosFinal();
