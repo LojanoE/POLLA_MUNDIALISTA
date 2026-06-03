@@ -120,12 +120,14 @@
           batch.set(ref, data);
         }
         
-        // 3. Crear instituciones por defecto
-        const instituciones = generarInstitucionesPorDefecto();
-        for (const inst of instituciones) {
-          const ref = doc(db, 'instituciones', inst.codigo);
-          batch.set(ref, inst);
-        }
+        // 3. Crear instituciones por defecto (SOLO GDR)
+        const refGDR = doc(db, 'instituciones', 'GDR');
+        batch.set(refGDR, {
+          nombre: 'GDR',
+          descripcion: 'Gerencia de Desarrollo y Recursos',
+          activo: true,
+          creado: new Date().toISOString()
+        });
         
         // 4. Crear documento de config
         const configRef = doc(db, 'config', 'app_config');
