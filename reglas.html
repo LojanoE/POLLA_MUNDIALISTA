@@ -70,36 +70,15 @@
           <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
             <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
             <div>
-              <strong style="color: var(--text-primary); display: block;">Empate en 90 min</strong>
-              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas que hay empate en los 90 min (independiente del marcador exacto del empate)</span>
-            </div>
-          </li>
-          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
-            <div>
-              <strong style="color: var(--text-primary); display: block;">Ganador en 90 min</strong>
-              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el ganador en 90 minutos (pero no el marcador exacto)</span>
-            </div>
-          </li>
-          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 1.5rem; font-weight: bold; color: gold; min-width: 40px;">3</span>
-            <div>
-              <strong style="color: var(--text-primary); display: block;">Penales Exactos</strong>
-              <span style="color: var(--text-muted); font-size: 0.9rem;">Si hay empate y aciertas el marcador exacto de los penales (ej: predijiste 4-3 y resultó 4-3)</span>
-            </div>
-          </li>
-          <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 1.5rem; font-weight: bold; color: silver; min-width: 40px;">1</span>
-            <div>
-              <strong style="color: var(--text-primary); display: block;">Ganador de Penales</strong>
-              <span style="color: var(--text-muted); font-size: 0.9rem;">Si hay empate y aciertas quién gana los penales (pero no el marcador exacto)</span>
+              <strong style="color: var(--text-primary); display: block;">Ganador o Empate en 90 min</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas quién gana o si empata, pero no el marcador exacto (ej: predijiste 2-1 y terminó 1-0)</span>
             </div>
           </li>
           <li style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;">
             <span style="font-size: 1.5rem; font-weight: bold; color: #cd7f32; min-width: 40px;">1</span>
             <div>
               <strong style="color: var(--text-primary); display: block;">Equipo que Avanza</strong>
-              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el equipo que clasifica a la siguiente ronda (quien gana el partido)</span>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Aciertas el equipo que gana el partido y clasifica a la siguiente ronda (ya sea en 90 min o en penales)</span>
             </div>
           </li>
         </ul>
@@ -107,6 +86,12 @@
         <div style="background: rgba(232, 197, 71, 0.1); border: 1px solid var(--accent); border-radius: 10px; padding: 15px; margin-top: 20px;">
           <p style="color: var(--accent); font-weight: bold; margin: 0;">
             💡 Máximo por partido: 4 puntos (3 por marcador exacto de 90 min + 1 por acertar quién avanza)
+          </p>
+        </div>
+        
+        <div style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; margin-top: 15px;">
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">
+            ℹ️ <strong>Nota sobre penales:</strong> Si hay empate en 90 min, debes ingresar un resultado de penales para definir quién avanza. Los penales no otorgan puntos extra; solo sirven para determinar el ganador del partido (1 pt por acertar quién avanza).
           </p>
         </div>
       </div>

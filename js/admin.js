@@ -528,27 +528,11 @@ async function recalcularTodosLosPuntos() {
         const g2 = partido.goles_equipo2;
         const p1 = pred.prediccion_equipo1;
         const p2 = pred.prediccion_equipo2;
-        const pg1 = pred.prediccion_penales_equipo1;
-        const pg2 = pred.prediccion_penales_equipo2;
         
         let ptsPartido = 0;
         
         if (p1 === g1 && p2 === g2) ptsPartido += 3;
-        else if (g1 === g2 && p1 === p2) ptsPartido += 1;
-        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1)) ptsPartido += 1;
-        
-        if (g1 === g2) {
-          const rp1 = partido.penales_equipo1;
-          const rp2 = partido.penales_equipo2;
-          if (rp1 !== null && rp2 !== null && pg1 !== undefined && pg2 !== undefined) {
-            if (pg1 === rp1 && pg2 === rp2) ptsPartido += 3;
-            else {
-              const realGan = rp1 > rp2 ? 'equipo1' : 'equipo2';
-              const predGan = pg1 > pg2 ? 'equipo1' : 'equipo2';
-              if (realGan === predGan) ptsPartido += 1;
-            }
-          }
-        }
+        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) ptsPartido += 1;
         
         const realGanador = getGanadorReal(partido);
         const predGanador = pred.prediccion_ganador;
@@ -561,140 +545,6 @@ async function recalcularTodosLosPuntos() {
       }
       
       puntosPorUsuario[u.id].puntosFinal = ptsFinal;
-    }
-    
-    // 6. Calcular bonos de progresión de ronda para cada usuario
-    for (const u of usuarios) {
-      const preds = predsFinal[u.id] || {};
-      let ptsBonos = 0;
-      
-      // Simular bracket del usuario basado en sus predicciones
-      const predEquiposPorRonda = {
-        octavos: new Set(),
-        cuartos: new Set(),
-        semis: new Set(),
-        finalistas: new Set(),
-        subcampeon: null,
-        campeon: null
-      };
-      
-      // Procesar todas las predicciones del usuario
-      for (const [partidoId, pred] of Object.entries(preds)) {
-        const partido = allPartidosFinal[partidoId];
-        if (!partido) continue;
-        
-        // Determinar ganador según predicción del usuario
-        // Usar prediccion_ganador primero (ya tiene el nombre real del equipo, no placeholder)
-        let predGanador = pred.prediccion_ganador || null;
-        
-        // Fallback: calcular desde marcador si no hay prediccion_ganador
-        if (!predGanador) {
-          const pg1 = pred.prediccion_equipo1;
-          const pg2 = pred.prediccion_equipo2;
-          const pp1 = pred.prediccion_penales_equipo1;
-          const pp2 = pred.prediccion_penales_equipo2;
-          
-          if (pg1 > pg2) predGanador = partido.equipo1;
-          else if (pg2 > pg1) predGanador = partido.equipo2;
-          else if (pp1 !== null && pp2 !== null && pp1 !== pp2) {
-            predGanador = pp1 > pp2 ? partido.equipo1 : partido.equipo2;
-          }
-        }
-        
-        if (!predGanador) continue;
-        
-        // Clasificar según ronda
-        if (partido.ronda === 'dieciseisavos') {
-          predEquiposPorRonda.octavos.add(predGanador);
-        } else if (partido.ronda === 'octavos') {
-          predEquiposPorRonda.cuartos.add(predGanador);
-        } else if (partido.ronda === 'cuartos') {
-          predEquiposPorRonda.semis.add(predGanador);
-        } else if (partido.ronda === 'semis') {
-          predEquiposPorRonda.finalistas.add(predGanador);
-        } else if (partido.ronda === 'final') {
-          // El ganador de la final es campeón
-          predEquiposPorRonda.campeon = predGanador;
-          // El perdedor es subcampeón (calcularlo desde scores si equipo1/equipo2 son placeholders)
-          const pg1 = pred.prediccion_equipo1;
-          const pg2 = pred.prediccion_equipo2;
-          const pp1 = pred.prediccion_penales_equipo1;
-          const pp2 = pred.prediccion_penales_equipo2;
-          let predPerdedor = null;
-          if (pg1 > pg2) {
-            predPerdedor = predGanador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
-          } else if (pg2 > pg1) {
-            predPerdedor = predGanador === partido.equipo2 ? partido.equipo1 : partido.equipo2;
-          } else if (pp1 !== null && pp2 !== null && pp1 !== pp2) {
-            predPerdedor = predGanador === partido.equipo1 ? partido.equipo2 : partido.equipo1;
-          }
-          // Solo guardar si no es un placeholder
-          if (predPerdedor && !predPerdedor.startsWith('Ganador') && !predPerdedor.startsWith('Perdedor')) {
-            predEquiposPorRonda.subcampeon = predPerdedor;
-          }
-        }
-      }
-      
-      // Comparar con resultados reales y otorgar bonos
-      const realEquiposPorRonda = {
-        octavos: new Set(),
-        cuartos: new Set(),
-        semis: new Set(),
-        finalistas: new Set(),
-        subcampeon: null,
-        campeon: null
-      };
-      
-      for (const [id, p] of Object.entries(allPartidosFinal)) {
-        if (!p.jugado) continue;
-        const ganador = getGanadorReal(p);
-        if (!ganador) continue;
-        
-        if (p.ronda === 'dieciseisavos') {
-          realEquiposPorRonda.octavos.add(ganador);
-        } else if (p.ronda === 'octavos') {
-          realEquiposPorRonda.cuartos.add(ganador);
-        } else if (p.ronda === 'cuartos') {
-          realEquiposPorRonda.semis.add(ganador);
-        } else if (p.ronda === 'semis') {
-          realEquiposPorRonda.finalistas.add(ganador);
-        } else if (p.ronda === 'final') {
-          realEquiposPorRonda.campeon = ganador;
-          realEquiposPorRonda.subcampeon = getPerdedorReal(p);
-        }
-      }
-      
-      // 1 pt por equipo en octavos
-      for (const equipo of predEquiposPorRonda.octavos) {
-        if (realEquiposPorRonda.octavos.has(equipo)) ptsBonos += 1;
-      }
-      
-      // 1 pt por equipo en cuartos
-      for (const equipo of predEquiposPorRonda.cuartos) {
-        if (realEquiposPorRonda.cuartos.has(equipo)) ptsBonos += 1;
-      }
-      
-      // 1 pt por equipo en semis
-      for (const equipo of predEquiposPorRonda.semis) {
-        if (realEquiposPorRonda.semis.has(equipo)) ptsBonos += 1;
-      }
-      
-      // 1 pt por finalista
-      for (const equipo of predEquiposPorRonda.finalistas) {
-        if (realEquiposPorRonda.finalistas.has(equipo)) ptsBonos += 1;
-      }
-      
-      // 2 pts por subcampeón
-      if (predEquiposPorRonda.subcampeon && predEquiposPorRonda.subcampeon === realEquiposPorRonda.subcampeon) {
-        ptsBonos += 2;
-      }
-      
-      // 4 pts por campeón
-      if (predEquiposPorRonda.campeon && predEquiposPorRonda.campeon === realEquiposPorRonda.campeon) {
-        ptsBonos += 4;
-      }
-      
-      puntosPorUsuario[u.id].puntosFinal += ptsBonos;
     }
     
     // 7. Guardar puntos en Firestore
