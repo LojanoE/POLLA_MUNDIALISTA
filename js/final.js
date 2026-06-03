@@ -1,9 +1,9 @@
 /* final.js - Fase Final: Sistema de pasos tipo cuestionario */
 
-import { db } from './firebase-config.js';
+import { db } from './firebase-config.js?v=6.0';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js';
-import { BANDERAS } from './data.js';
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=6.0';
+import { BANDERAS } from './data.js?v=6.0';
 
 const user = requireAuth();
 if (!user) throw new Error("No autenticado");
