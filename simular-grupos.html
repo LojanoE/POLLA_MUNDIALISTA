@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🧪 Simular Fase de Grupos - Polla Mundialista</title>
-  <link rel="stylesheet" href="css/styles.css?v=7.0">
+  <link rel="stylesheet" href="css/styles.css?v=7.1">
   <style>
     .sim-container { max-width: 700px; margin: 40px auto; padding: 20px; }
     .sim-btn { font-size: 1.1rem; padding: 12px 24px; margin: 8px; }
@@ -49,9 +49,9 @@
   </footer>
 
   <script type="module">
-    import { db } from './js/firebase-config.js?v=7.0';
+    import { db } from './js/firebase-config.js?v=7.1';
     import { collection, doc, setDoc, writeBatch, getDocs, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { generarPartidosGrupos } from './js/data.js?v=7.0';
+    import { generarPartidosGrupos } from './js/data.js?v=7.1';
     
     const logEl = document.getElementById('log');
     const statsContainer = document.getElementById('stats-container');
@@ -161,6 +161,8 @@
           await setDoc(doc(db, 'users', userId), {
             cedula: esc.cedula,
             alias: esc.alias,
+            institucion_activa: 'GDR',
+            instituciones: ['GDR'],
             puntos_fase_grupos: 0,
             puntos_fase_final: 0,
             puntos_total: 0,
@@ -180,9 +182,11 @@
             const { g1, g2 } = generarResultado(esc.tipo);
             const docId = `${userId}_${p.id}`;
             
-            batch.set(doc(db, 'predicciones_grupos', docId), {
+            const predDocId = `${esc.cedula}_${esc.alias}_GDR_${p.id}`;
+            batch.set(doc(db, 'predicciones_grupos', predDocId), {
               user_id: userId,
               partido_id: p.id,
+              institucion: 'GDR',
               prediccion_equipo1: g1,
               prediccion_equipo2: g2,
               actualizado: new Date().toISOString()

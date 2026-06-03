@@ -1,6 +1,6 @@
 /* reglas.js - Página de Reglas */
 
-import { requireAuth, updateNav, logout, getCurrentUser } from './auth.js?v=7.0';
+import { getCurrentUser, updateNav, logout } from './auth.js?v=7.1';
 
 // No requerimos auth para ver reglas, pero si hay sesión mostramos el nav
 const user = getCurrentUser();
@@ -14,9 +14,4 @@ if (user) {
   const navLogout = document.getElementById('nav-logout');
   if (navUser) navUser.style.display = 'none';
   if (navLogout) navLogout.style.display = 'none';
-}
-
-function getCurrentUser() {
-  const user = localStorage.getItem("polla_user");
-  return user ? JSON.parse(user) : null;
 }

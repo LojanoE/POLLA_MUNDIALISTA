@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.0';
+import { db } from './firebase-config.js?v=7.1';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.0';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.0';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.1';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.1';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -315,10 +315,10 @@ document.getElementById('btn-save-grupos').addEventListener('click', async () =>
     let count = 0;
     
     for (const [id, vals] of Object.entries(resultadosGrupos)) {
-      const g1 = vals.g1 !== null && vals.g1 !== undefined ? parseInt(vals.g1) : null;
-      const g2 = vals.g2 !== null && vals.g2 !== undefined ? parseInt(vals.g2) : null;
+      const g1 = (vals.g1 !== null && vals.g1 !== undefined && vals.g1 !== '') ? parseInt(vals.g1) : null;
+      const g2 = (vals.g2 !== null && vals.g2 !== undefined && vals.g2 !== '') ? parseInt(vals.g2) : null;
       
-      if (g1 !== null && g2 !== null) {
+      if (g1 !== null && g2 !== null && !isNaN(g1) && !isNaN(g2)) {
         const ref = doc(db, 'partidos_grupos', id);
         batch.update(ref, {
           goles_equipo1: g1,
@@ -2199,6 +2199,213 @@ window.eliminarUsuario = async (cedula, alias) => {
     showToast('Error', 'Error eliminando usuario', 'error');
   }
 };
+
+// ===== BRACKET VISUAL (ADMIN) =====
+const BRACKET_NEXT_MATCH = {
+  'F1': 'F17', 'F2': 'F17', 'F3': 'F18', 'F4': 'F18',
+  'F5': 'F19', 'F6': 'F19', 'F7': 'F20', 'F8': 'F20',
+  'F9': 'F21', 'F10': 'F21', 'F11': 'F22', 'F12': 'F22',
+  'F13': 'F23', 'F14': 'F23', 'F15': 'F24', 'F16': 'F24',
+  'F17': 'F25', 'F18': 'F25', 'F19': 'F26', 'F20': 'F26',
+  'F21': 'F27', 'F22': 'F27', 'F23': 'F28', 'F24': 'F28',
+  'F25': 'F29', 'F26': 'F29', 'F27': 'F30', 'F28': 'F30',
+  'F29': 'F32', 'F30': 'F32'
+};
+
+const BRACKET_LEFT = ['F1','F2','F3','F4','F5','F6','F7','F8','F17','F18','F19','F20','F25','F26','F29'];
+const BRACKET_RIGHT = ['F9','F10','F11','F12','F13','F14','F15','F16','F21','F22','F23','F24','F27','F28','F30'];
+
+function esPlaceholderAdmin(equipo) {
+  return !equipo || equipo.startsWith('Ganador') || equipo.startsWith('Perdedor') || /^[123][A-L]$/.test(equipo) || /^T[1-8]$/.test(equipo);
+}
+
+function getFlagUrlAdmin(pais) {
+  if (!pais || esPlaceholderAdmin(pais)) return null;
+  const code = BANDERAS[pais] || 'xx';
+  return `https://flagcdn.com/w40/${code}.png`;
+}
+
+function renderEquipoBracketAdmin(equipoNombre) {
+  const flagUrl = getFlagUrlAdmin(equipoNombre);
+  const esPh = esPlaceholderAdmin(equipoNombre);
+  const clase = esPh ? 'placeholder' : 'real';
+  if (flagUrl) {
+    return `<div class="bracket-team ${clase}"><img src="${flagUrl}" alt="${equipoNombre}"><span>${equipoNombre}</span></div>`;
+  } else {
+    return `<div class="bracket-team ${clase}"><div class="placeholder-icon-bracket">?</div><span>${equipoNombre}</span></div>`;
+  }
+}
+
+function calcularEquipoBracketAdmin(partidoId, esEquipo1) {
+  const partido = partidosFinalData.find(p => p.id === partidoId);
+  if (!partido) return '?';
+  
+  if (partido.ronda === 'dieciseisavos') {
+    return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  }
+  
+  let sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+  if (!sourceId) {
+    const nombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
+    const match = nombre.match(/(F\d+)/);
+    if (match) sourceId = match[1];
+  }
+  if (!sourceId) return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  
+  const resSource = resultadosFinal[sourceId];
+  const sourcePartido = partidosFinalData.find(p => p.id === sourceId);
+  if (!sourcePartido || !resSource || resSource.g1 === '' || resSource.g2 === '') {
+    return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  }
+  
+  const g1 = parseInt(resSource.g1);
+  const g2 = parseInt(resSource.g2);
+  const p1 = resSource.p1 !== '' ? parseInt(resSource.p1) : null;
+  const p2 = resSource.p2 !== '' ? parseInt(resSource.p2) : null;
+  
+  let ganador = null;
+  if (g1 > g2) ganador = sourcePartido.equipo1;
+  else if (g2 > g1) ganador = sourcePartido.equipo2;
+  else if (p1 !== null && p2 !== null && p1 !== p2) {
+    ganador = p1 > p2 ? sourcePartido.equipo1 : sourcePartido.equipo2;
+  }
+  
+  if (!ganador) return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  
+  const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
+  if (esPerdedor) {
+    return ganador === sourcePartido.equipo1 ? sourcePartido.equipo2 : sourcePartido.equipo1;
+  }
+  return ganador;
+}
+
+function calcularTodosEquiposBracket() {
+  const equipos = {};
+  for (const ronda of RONDAS) {
+    for (const p of (partidosFinalPorRonda[ronda] || [])) {
+      if (ronda === 'dieciseisavos') {
+        equipos[p.id] = { eq1: p.equipo1, eq2: p.equipo2 };
+      } else {
+        equipos[p.id] = {
+          eq1: calcularEquipoBracketAdmin(p.id, true),
+          eq2: calcularEquipoBracketAdmin(p.id, false)
+        };
+      }
+    }
+  }
+  return equipos;
+}
+
+function renderMatchBracketAdmin(partidoId, equipos) {
+  const eq1 = equipos[partidoId]?.eq1 || '?';
+  const eq2 = equipos[partidoId]?.eq2 || '?';
+  const nextId = BRACKET_NEXT_MATCH[partidoId];
+  const arrow = nextId ? `<span class="bracket-arrow">→ <span>${nextId}</span></span>` : '';
+  return `
+    <div class="bracket-match">
+      <span class="bracket-match-id">${partidoId}</span>
+      ${renderEquipoBracketAdmin(eq1)}
+      <span class="bracket-vs">VS</span>
+      ${renderEquipoBracketAdmin(eq2)}
+      ${arrow}
+    </div>
+  `;
+}
+
+function renderRondaBracketAdmin(titulo, idsMatch, equipos) {
+  const matchesHtml = idsMatch.map(id => renderMatchBracketAdmin(id, equipos)).join('');
+  return `
+    <div class="bracket-round">
+      <div class="bracket-round-title">${titulo}</div>
+      ${matchesHtml}
+    </div>
+  `;
+}
+
+function renderizarBracketAdmin() {
+  const container = document.getElementById('modal-bracket-body');
+  if (!container) return;
+  
+  const equipos = calcularTodosEquiposBracket();
+  
+  const leftDieciseisavos = BRACKET_LEFT.filter(id => parseInt(id.substring(1)) <= 16);
+  const leftOctavos = BRACKET_LEFT.filter(id => { const n = parseInt(id.substring(1)); return n >= 17 && n <= 20; });
+  const leftCuartos = BRACKET_LEFT.filter(id => { const n = parseInt(id.substring(1)); return n >= 25 && n <= 26; });
+  const leftSemis = BRACKET_LEFT.filter(id => id === 'F29');
+  
+  const rightDieciseisavos = BRACKET_RIGHT.filter(id => parseInt(id.substring(1)) <= 16);
+  const rightOctavos = BRACKET_RIGHT.filter(id => { const n = parseInt(id.substring(1)); return n >= 21 && n <= 24; });
+  const rightCuartos = BRACKET_RIGHT.filter(id => { const n = parseInt(id.substring(1)); return n >= 27 && n <= 28; });
+  const rightSemis = BRACKET_RIGHT.filter(id => id === 'F30');
+  
+  const html = `
+    <div class="bracket-container">
+      <div class="bracket-half">
+        <div class="bracket-half-title">🔼 Mitad Superior</div>
+        ${renderRondaBracketAdmin('Dieciseisavos de Final', leftDieciseisavos, equipos)}
+        ${renderRondaBracketAdmin('Octavos de Final', leftOctavos, equipos)}
+        ${renderRondaBracketAdmin('Cuartos de Final', leftCuartos, equipos)}
+        ${renderRondaBracketAdmin('Semifinal', leftSemis, equipos)}
+      </div>
+      <div class="bracket-half">
+        <div class="bracket-half-title">🔽 Mitad Inferior</div>
+        ${renderRondaBracketAdmin('Dieciseisavos de Final', rightDieciseisavos, equipos)}
+        ${renderRondaBracketAdmin('Octavos de Final', rightOctavos, equipos)}
+        ${renderRondaBracketAdmin('Cuartos de Final', rightCuartos, equipos)}
+        ${renderRondaBracketAdmin('Semifinal', rightSemis, equipos)}
+      </div>
+      <div class="bracket-final-section">
+        <div class="bracket-final-box">
+          <div class="bracket-round-title">🏆 La Gran Final</div>
+          ${renderMatchBracketAdmin('F32', equipos)}
+        </div>
+        <div class="bracket-final-box" style="border-color: #cd7f32;">
+          <div class="bracket-round-title" style="color: #cd7f32;">🥉 Tercer Lugar</div>
+          ${renderMatchBracketAdmin('F31', equipos)}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  container.innerHTML = html;
+}
+
+// Control del modal bracket
+const modalBracket = document.getElementById('modal-bracket');
+const btnVerBracket = document.getElementById('btn-ver-bracket');
+const btnCloseBracket = document.getElementById('modal-bracket-close');
+const btnCloseBracketFooter = document.getElementById('modal-bracket-close-btn');
+
+if (btnVerBracket) {
+  btnVerBracket.addEventListener('click', () => {
+    if (modalBracket) {
+      renderizarBracketAdmin();
+      modalBracket.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+  });
+}
+
+function cerrarModalBracket() {
+  if (modalBracket) {
+    modalBracket.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+if (btnCloseBracket) btnCloseBracket.addEventListener('click', cerrarModalBracket);
+if (btnCloseBracketFooter) btnCloseBracketFooter.addEventListener('click', cerrarModalBracket);
+if (modalBracket) {
+  modalBracket.addEventListener('click', (e) => {
+    if (e.target === modalBracket) cerrarModalBracket();
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modalBracket && modalBracket.style.display === 'flex') {
+    cerrarModalBracket();
+  }
+});
 
 // ===== INICIALIZACIÓN =====
 async function init() {
