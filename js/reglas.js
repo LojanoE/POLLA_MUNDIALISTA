@@ -1,6 +1,6 @@
 /* reglas.js - Página de Reglas */
 
-import { requireAuth, updateNav, logout, getCurrentUser } from './auth.js?v=6.0';
+import { requireAuth, updateNav, logout, getCurrentUser } from './auth.js?v=7.0';
 
 // No requerimos auth para ver reglas, pero si hay sesión mostramos el nav
 const user = getCurrentUser();
