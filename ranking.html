@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ranking - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=7.4">
+  <link rel="stylesheet" href="css/styles.css?v=7.5">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
 
   <div class="container">
     <h2 style="color: var(--accent); text-align: center; margin-bottom: 10px;">📊 Tabla de Posiciones</h2>
-    <p style="text-align: center; color: var(--text-muted); margin-bottom: 30px;">Ranking de participantes por puntos acumulados</p>
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 30px;">Ranking de participantes por fase</p>
     
     <div id="institucion-badge" class="institucion-badge" style="display:none; text-align:center; margin-bottom:15px;">
       <span>🏢</span> <span id="institucion-nombre"></span>
@@ -43,28 +43,51 @@
     
     <div id="alert-box" class="alert"></div>
     
-    <div style="overflow-x: auto;">
-      <table class="ranking-table">
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th>Alias</th>
-            <th>Pts Fase Grupos</th>
-            <th>Pts Fase Final</th>
-            <th>Pts Total</th>
-          </tr>
-        </thead>
-        <tbody id="ranking-body">
-          <tr><td colspan="5" style="text-align:center; padding:30px;"><div class="spinner"></div></td></tr>
-        </tbody>
-      </table>
+    <!-- Ranking Fase de Grupos -->
+    <div style="margin-bottom: 40px;">
+      <h3 style="color: var(--accent); text-align: center; margin-bottom: 15px;">⚽ Ranking Fase de Grupos</h3>
+      <div style="overflow-x: auto;">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Alias</th>
+              <th class="inst-col-header" style="display:none;">Institución</th>
+              <th>Pts Fase Grupos</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-grupos-body">
+            <tr><td colspan="3" style="text-align:center; padding:30px;"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Ranking Fase Final -->
+    <div style="margin-bottom: 40px;">
+      <h3 style="color: var(--accent); text-align: center; margin-bottom: 15px;">🏆 Ranking Fase Final</h3>
+      <div style="overflow-x: auto;">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Alias</th>
+              <th class="inst-col-header" style="display:none;">Institución</th>
+              <th>Pts Fase Final</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-final-body">
+            <tr><td colspan="3" style="text-align:center; padding:30px;"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px;">
-    Polla Mundialista 2026 - v7.4
+    Polla Mundialista 2026 - v7.5
   </footer>
 
-  <script type="module" src="js/ranking.js?v=7.4"></script>
+  <script type="module" src="js/ranking.js?v=7.5"></script>
 </body>
 </html>

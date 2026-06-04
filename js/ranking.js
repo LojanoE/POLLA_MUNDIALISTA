@@ -1,8 +1,8 @@
-/* ranking.js - Tabla de posiciones en tiempo real, filtrado por institución */
+/* ranking.js - Tablas de posiciones en tiempo real, filtrado por institución */
 
-import { db } from './firebase-config.js?v=7.4';
-import { collection, query, getDocs, onSnapshot, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.4';
+import { db } from './firebase-config.js?v=7.5';
+import { collection, query, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.5';
 
 const user = requireAuth();
 if (!user) throw new Error("No autenticado");
@@ -87,18 +87,19 @@ async function cargarInstituciones() {
   }
 }
 
-// Función para renderizar ranking
-function renderizarRanking(usuarios) {
-  const tbody = document.getElementById('ranking-body');
+// Renderizar ranking de Fase de Grupos
+function renderizarRankingGrupos(usuarios) {
+  const tbody = document.getElementById('ranking-grupos-body');
   tbody.innerHTML = '';
   
   if (usuarios.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${isAdmin ? 6 : 5}" style="text-align:center; padding:30px; color:var(--text-muted);">Aún no hay participantes registrados${!isAdmin && institucionFiltro !== 'TODAS' ? ' en esta institución' : ''}</td></tr>`;
+    const colSpan = isAdmin ? 4 : 3;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; padding:30px; color:var(--text-muted);">Aún no hay participantes registrados${!isAdmin && institucionFiltro !== 'TODAS' ? ' en esta institución' : ''}</td></tr>`;
     return;
   }
   
-  // Ordenar por puntos totales descendente
-  usuarios.sort((a, b) => (b.puntos_total || 0) - (a.puntos_total || 0));
+  // Ordenar por puntos fase grupos descendente
+  usuarios.sort((a, b) => (b.puntos_fase_grupos || 0) - (a.puntos_fase_grupos || 0));
   
   usuarios.forEach((u, index) => {
     const pos = index + 1;
@@ -118,9 +119,46 @@ function renderizarRanking(usuarios) {
       <td class="${rankClass}">${pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : pos}</td>
       <td style="text-align:left; font-weight:600;">${u.alias}</td>
       ${instCol}
-      <td>${u.puntos_fase_grupos || 0}</td>
-      <td>${u.puntos_fase_final || 0}</td>
-      <td style="font-weight:bold; color:var(--accent); font-size:1.1rem;">${u.puntos_total || 0}</td>
+      <td style="font-weight:bold; color:var(--accent);">${u.puntos_fase_grupos || 0}</td>
+    `;
+    
+    tbody.appendChild(tr);
+  });
+}
+
+// Renderizar ranking de Fase Final
+function renderizarRankingFinal(usuarios) {
+  const tbody = document.getElementById('ranking-final-body');
+  tbody.innerHTML = '';
+  
+  if (usuarios.length === 0) {
+    const colSpan = isAdmin ? 4 : 3;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; padding:30px; color:var(--text-muted);">Aún no hay participantes registrados${!isAdmin && institucionFiltro !== 'TODAS' ? ' en esta institución' : ''}</td></tr>`;
+    return;
+  }
+  
+  // Ordenar por puntos fase final descendente
+  usuarios.sort((a, b) => (b.puntos_fase_final || 0) - (a.puntos_fase_final || 0));
+  
+  usuarios.forEach((u, index) => {
+    const pos = index + 1;
+    const tr = document.createElement('tr');
+    
+    let rankClass = '';
+    if (pos === 1) rankClass = 'rank-1';
+    else if (pos === 2) rankClass = 'rank-2';
+    else if (pos === 3) rankClass = 'rank-3';
+    
+    let instCol = '';
+    if (isAdmin) {
+      instCol = `<td style="font-size:0.85rem; color:var(--text-muted);">${u.institucion_activa || 'N/A'}</td>`;
+    }
+    
+    tr.innerHTML = `
+      <td class="${rankClass}">${pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : pos}</td>
+      <td style="text-align:left; font-weight:600;">${u.alias}</td>
+      ${instCol}
+      <td style="font-weight:bold; color:var(--accent);">${u.puntos_fase_final || 0}</td>
     `;
     
     tbody.appendChild(tr);
@@ -129,14 +167,10 @@ function renderizarRanking(usuarios) {
 
 // Actualizar encabezados de tabla según rol
 function actualizarEncabezados() {
-  const thead = document.querySelector('.ranking-table thead tr');
-  if (isAdmin && thead && !thead.querySelector('.inst-col')) {
-    const th = document.createElement('th');
-    th.className = 'inst-col';
-    th.textContent = 'Institución';
-    // Insertar después de Alias
-    thead.insertBefore(th, thead.children[2]);
-  }
+  const headers = document.querySelectorAll('.inst-col-header');
+  headers.forEach(th => {
+    th.style.display = isAdmin ? 'table-cell' : 'none';
+  });
 }
 
 // Determinar si un usuario pertenece a una institución (con fallback)
@@ -174,7 +208,8 @@ async function cargarRanking() {
         return usuarioPerteneceAInstitucion(u, userInst);
       });
       
-      renderizarRanking(usuariosFiltrados);
+      renderizarRankingGrupos(usuariosFiltrados);
+      renderizarRankingFinal(usuariosFiltrados);
     }, (err) => {
       console.error(err);
       showAlert('Error cargando ranking', 'danger');

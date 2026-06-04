@@ -16,7 +16,7 @@ Vanilla HTML/CSS/JS frontend for a soccer-prediction pool (bracket pool). No bui
 | `grupos.html` + `js/grupos.js` | Participants predict group-stage match scores (72 matches, 12 groups) |
 | `final.html` + `js/final.js` | **Bracket pool:** Participants predict ALL 32 knockout matches (16avos → 8vos → 4tos → semis → 3er lugar → final). Dynamic team calculation based on user's own predictions. |
 | `admin.html` + `js/admin.js` | Admin enters real results, **generates knockout bracket automatically from group results**, enables final phase, recalculates scores, manages users and institutions |
-| `ranking.html` + `js/ranking.js` | Live leaderboard (onSnapshot listener), filterable by institution |
+| `ranking.html` + `js/ranking.js` | Two separate leaderboards: one for group-stage points and one for knockout-stage points, both filterable by institution |
 | `reglas.html` + `js/reglas.js` | Rules page visible to all users (no auth required) |
 | `init-db.html` | One-time setup page that seeds Firestore with all matches, config, and default institution |
 | `diagnostico.html` | Firebase connection diagnostic tool |
@@ -40,10 +40,12 @@ Vanilla HTML/CSS/JS frontend for a soccer-prediction pool (bracket pool). No bui
    - Creates the remaining 16 matches with dynamic placeholders ("Ganador F1", "Perdedor F29")
 4. Admin reviews the generated bracket and then toggles **"Habilitar Fase Final"**.
 5. Participants access `final.html` and predict **all 32 knockout matches** in one session.
-6. Participants fill the entire bracket: 16avos → 8vos → 4tos → semis → 3er lugar → final.
+   - Participants fill the entire bracket: 16avos → 8vos → 4tos → semis → 3er lugar → final.
    - Teams in later rounds are calculated dynamically based on the participant's own previous predictions.
    - **All 32 matches must be filled** before the "Save" button becomes enabled.
-7. After each real knockout round, admin enters real results and clicks **"🔄 Recalcular Puntajes"**.
+   - Participants can save progress incrementally and **edit previously saved predictions** before finalizing.
+6. After each real knockout round, admin enters real results. The system supports **partial save per round** (only valid matches are saved, errors are reported).
+7. Admin clicks **"🔄 Recalcular Puntajes"** to update all participant scores.
 
 ## Bracket structure (32 matches)
 - **16avos (F1–F16):** 1A vs 3C, 2B vs 2F, etc. (equipos reales)
@@ -55,12 +57,12 @@ Vanilla HTML/CSS/JS frontend for a soccer-prediction pool (bracket pool). No bui
 
 Each `partidos_final` doc includes `source_equipo1` and `source_equipo2` fields pointing to the previous match ID (e.g., F17's source_equipo1 = "F1"). The 3rd-place match additionally uses `perdedor_source1` / `perdedor_source2` flags to indicate it takes the **loser** of the source semifinal.
 
-## Dynamic team calculation (js/final.js)
-When rendering the bracket for a participant:
+## Dynamic team calculation (js/final.js and js/admin.js)
+Both panels use recursive team resolution with a global cache (`equiposCalculados` / `equiposCalculadosAdmin`) to propagate real team names across all rounds:
 - **16avos:** Show real team names from the database.
-- **8vos and beyond:** Look up the participant's prediction for the source match. If they predicted Team X won F1, then Team X appears as the opponent in F17. If they haven't predicted the source match yet, show placeholder "Ganador F1".
+- **8vos and beyond:** Look up the prediction/result for the source match. The winner advances, and the loser goes to the 3rd-place match.
 - For the **3rd-place match**, show the **loser** of the source semifinal.
-- When a participant changes a 16avos prediction, all downstream matches update in real time.
+- When a result/prediction changes, all downstream matches update in real time.
 
 ## Scoring rules (lives in `js/admin.js`)
 
@@ -70,28 +72,13 @@ When rendering the bracket for a participant:
 
 ### Knockout (per match)
 - Exact 90-min score: 3 pts
-- Correct draw in 90 min (any score): 1 pt
-- Correct winner in 90 min (not exact): 1 pt
-- Exact penalty shootout score: 3 pts
-- Correct penalty winner (not exact): 1 pt
+- Correct winner or draw in 90 min (not exact): 1 pt
 - Correct advancing team: 1 pt
 - Max per match: 4 pts (exact 90-min + advancing)
 
-### Round-progression bonus (based on REAL results)
-These are calculated during "Recalcular Puntajes" by simulating the user's bracket and comparing with actual outcomes:
-- 1 pt for each team correctly predicted to reach **Round of 16** (octavos)
-- 1 pt for each team correctly predicted to reach **Quarterfinals** (cuartos)
-- 1 pt for each team correctly predicted to reach **Semifinals** (semis)
-- 1 pt for each correctly predicted **Finalist**
-- 2 pts for correctly predicted **Runner-up** (subcampeón)
-- 4 pts for correctly predicted **Champion** (campeón)
-
-## User management
-- **2 aliases per cedula:** A person can register twice with the same cedula but different aliases (max 2). Each alias is a separate ranking entry.
-- User ID format: `{cedula}_{alias}` (e.g., "1234567890_Luis")
-- Prediction IDs: `{cedula}_{alias}_{partido_id}`
-- **Institution required:** Every user must select an `institucion` on login. Users can belong to multiple institutions over time; `institucion_activa` is stored on the user doc and in localStorage.
-- Admin can search users by cedula or alias, view all their predictions, delete individual predictions, or delete a user entirely (including all their predictions).
+### Penalties
+- Penalties are only used to determine the advancing team.
+- No separate points are awarded for predicting the exact penalty score; they only serve as the tiebreaker for the "correct advancing team" point.
 
 ## Admin panel features
 - **🗃️ Inicializar Base de Datos:** Load all 72 group + 32 knockout matches, default institution, and config into Firestore.
@@ -100,9 +87,22 @@ These are calculated during "Recalcular Puntajes" by simulating the user's brack
 - **🎮 Control de Fases:** Toggle "Habilitar Fase Final" switch.
 - **👥 Gestión de Usuarios:** Search users, view their predictions, edit/delete individual predictions, delete entire users.
 - **🏛️ Gestión de Instituciones:** Add/remove/activate institutions. Only active institutions appear in the login dropdown.
-- **⚽ Ingresar Resultados - Fase de Grupos:** Enter real scores for all 72 group matches.
-- **🏆 Ingresar Resultados - Fase Final:** Enter real scores + penalties for all 32 knockout matches. Admin can also edit team names if needed.
-- **🔄 Recalcular Puntajes:** Recalculate all user scores based on real results entered.
+- **⚽ Ingresar Resultados - Fase de Grupos:** Enter real scores for all 72 group matches. Results are auto-marked as `jugado`.
+- **🏆 Ingresar Resultados - Fase Final:** Wizard with 6 steps (16avos → 8vos → 4tos → semis → 3er lugar → final).
+  - Admin can **edit team names manually in ANY round** (not only 16avos) via "✏️ Cambiar" button.
+  - Supports **partial save**: only valid matches are saved; errors (missing penalties, equal penalties) are reported.
+  - **Auto-marks `jugado=true`** when valid scores are entered.
+  - Allows **deleting results** by emptying inputs.
+  - Cleans up stale penalty fields when a match changes from draw to non-draw.
+  - Includes **quick navigation bar** at the top and a "Go to Final Results" link inside "Generate Final Phase".
+- **🔄 Recalcular Puntajes:** Recalculate all user scores. Score updates are batched in chunks of 400 to respect Firestore limits.
+
+## User management
+- **2 aliases per cedula:** A person can register twice with the same cedula but different aliases (max 2). Each alias is a separate ranking entry.
+- User ID format: `{cedula}_{alias}` (e.g., "1234567890_Luis")
+- Prediction IDs: `{cedula}_{alias}_{partido_id}` (final predictions also include `{institucion}` in the doc ID)
+- **Institution required:** Every user must select an `institucion` on login. Users can belong to multiple institutions over time; `institucion_activa` is stored on the user doc and in localStorage.
+- Admin can search users by cedula or alias, view all their predictions, delete individual predictions, or delete a user entirely (including all their predictions).
 
 ## Firebase rules note
 Firestore security rules are not enforced here. The app relies on custom auth logic in JS and open read/write rules for simplicity. If you tighten rules, ensure `partidos_grupos`, `partidos_final`, `predicciones_grupos`, `predicciones_final`, `users`, `instituciones`, and `config` are all accessible to authenticated client logic.
@@ -115,7 +115,7 @@ All JS files are ES modules using `import` with:
 Pages reference scripts with `<script type="module" src="...">`.
 
 ## Cache busting / versioning
-All CSS and JS references use `?v=7.2` query parameters to force browser refresh during testing. Bump this version (e.g., `?v=7.2` → `?v=7.2`) when making major structural changes to ensure users get the latest files without hard-refreshing.
+All CSS and JS references use `?v=7.5` query parameters to force browser refresh during testing. Bump this version when making major structural changes to ensure users get the latest files without hard-refreshing.
 
 ## What not to add
 - Do NOT add a build tool, bundler, or framework unless explicitly requested.
