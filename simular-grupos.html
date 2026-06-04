@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🧪 Simular Fase de Grupos - Polla Mundialista</title>
-  <link rel="stylesheet" href="css/styles.css?v=7.3">
+  <link rel="stylesheet" href="css/styles.css?v=7.4">
   <style>
     .sim-container { max-width: 700px; margin: 40px auto; padding: 20px; }
     .sim-btn { font-size: 1.1rem; padding: 12px 24px; margin: 8px; }
@@ -45,13 +45,13 @@
   </div>
 
   <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px;">
-    Polla Mundialista 2026 - v7.3
+    Polla Mundialista 2026 - v7.4
   </footer>
 
   <script type="module">
-    import { db } from './js/firebase-config.js?v=7.3';
+    import { db } from './js/firebase-config.js?v=7.4';
     import { collection, doc, setDoc, writeBatch, getDocs, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { generarPartidosGrupos } from './js/data.js?v=7.3';
+    import { generarPartidosGrupos } from './js/data.js?v=7.4';
     
     const logEl = document.getElementById('log');
     const statsContainer = document.getElementById('stats-container');
@@ -317,7 +317,7 @@
   </script>
 
   <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px;">
-    Polla Mundialista 2026 - v7.3
+    Polla Mundialista 2026 - v7.4
   </footer>
 </body>
 </html>

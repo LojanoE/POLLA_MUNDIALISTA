@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.3';
+import { db } from './firebase-config.js?v=7.4';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.3';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.3';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.4';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.4';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -383,17 +383,19 @@ async function recalcularTodosLosPuntos() {
     });
     
     // 3. Obtener predicciones de grupos (filtradas por institución activa del usuario)
-    // Normalizar: asegurar que cada usuario tenga institucion_activa
-    const batchUsers = writeBatch(db);
+    // Normalizar: asegurar que cada usuario tenga institucion_activa (chunking de 400 ops)
     let usersUpdated = 0;
-    for (const u of usuarios) {
-      if (!u.institucion_activa && u.instituciones && u.instituciones.length > 0) {
+    const usuariosSinInstitucion = usuarios.filter(u => !u.institucion_activa && u.instituciones && u.instituciones.length > 0);
+    for (let i = 0; i < usuariosSinInstitucion.length; i += 400) {
+      const batchUsers = writeBatch(db);
+      const chunk = usuariosSinInstitucion.slice(i, i + 400);
+      for (const u of chunk) {
         u.institucion_activa = u.instituciones[0];
         batchUsers.update(doc(db, 'users', u.id), { institucion_activa: u.instituciones[0] });
         usersUpdated++;
       }
+      await batchUsers.commit();
     }
-    if (usersUpdated > 0) await batchUsers.commit();
     
     const predsGruposSnap = await getDocs(collection(db, 'predicciones_grupos'));
     const predsGrupos = {};
@@ -655,7 +657,7 @@ function recalcularTodosEquiposAdmin() {
   }
 }
 
-function calcularEquipoDinamico(partidoId, esEquipo1) {
+function calcularEquipoDinamico(partidoId, esEquipo1, visited = new Set()) {
   const partido = partidosFinalData.find(p => p.id === partidoId);
   if (!partido) return 'Por definir';
   
@@ -663,6 +665,11 @@ function calcularEquipoDinamico(partidoId, esEquipo1) {
   if (partido.ronda === 'dieciseisavos') {
     return esEquipo1 ? partido.equipo1 : partido.equipo2;
   }
+  
+  // Proteccion contra ciclos infinitos
+  const key = `${partidoId}_${esEquipo1}`;
+  if (visited.has(key)) return 'Por definir';
+  visited.add(key);
   
   // Si ya está en cache, usarlo
   const cached = equiposCalculadosAdmin[partidoId];
@@ -678,10 +685,13 @@ function calcularEquipoDinamico(partidoId, esEquipo1) {
   }
   if (!sourceId) return 'Por definir';
   
+  // Para 3er lugar, mostrar "Perdedor" cuando falta el resultado (igual que final.js)
+  const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
+  
   const resSource = resultadosFinal[sourceId];
   const sourcePartido = partidosFinalData.find(p => p.id === sourceId);
   if (!sourcePartido || !resSource || resSource.g1 === '' || resSource.g2 === '') {
-    return esEquipo1 ? `Ganador ${sourceId}` : `Ganador ${sourceId}`;
+    return esPerdedor ? `Perdedor ${sourceId}` : `Ganador ${sourceId}`;
   }
   
   const g1 = parseInt(resSource.g1);
@@ -690,8 +700,8 @@ function calcularEquipoDinamico(partidoId, esEquipo1) {
   const p2 = resSource.p2 !== '' ? parseInt(resSource.p2) : null;
   
   // Resolver nombres reales del source recursivamente (usando cache si existe)
-  const eq1Source = equiposCalculadosAdmin[sourceId]?.eq1 || calcularEquipoDinamico(sourceId, true);
-  const eq2Source = equiposCalculadosAdmin[sourceId]?.eq2 || calcularEquipoDinamico(sourceId, false);
+  const eq1Source = equiposCalculadosAdmin[sourceId]?.eq1 || calcularEquipoDinamico(sourceId, true, visited);
+  const eq2Source = equiposCalculadosAdmin[sourceId]?.eq2 || calcularEquipoDinamico(sourceId, false, visited);
   
   let ganador = null;
   if (g1 > g2) ganador = eq1Source;
@@ -700,9 +710,8 @@ function calcularEquipoDinamico(partidoId, esEquipo1) {
     ganador = p1 > p2 ? eq1Source : eq2Source;
   }
   
-  if (!ganador) return `Ganador ${sourceId}`;
+  if (!ganador) return esPerdedor ? `Perdedor ${sourceId}` : `Ganador ${sourceId}`;
   
-  const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
   if (esPerdedor) {
     return ganador === eq1Source ? eq2Source : eq1Source;
   }
@@ -758,7 +767,7 @@ function renderizarRondaActual() {
             <img src="${getFlagUrl(eq1Calculado)}" style="width:32px; height:24px; border-radius:4px; object-fit:cover;" onerror="this.style.display='none'">
             <div style="display:flex; flex-direction:column;">
               <span style="font-weight:600; font-size:0.95rem;">${eq1Calculado}</span>
-              ${ronda === 'dieciseisavos' ? `<button class="edit-team-btn" onclick="window.abrirSeleccionEquipo('${p.id}', true)">✏️ Cambiar</button>` : ''}
+              <button class="edit-team-btn" onclick="window.abrirSeleccionEquipo('${p.id}', true)">✏️ Cambiar</button>
             </div>
           </div>
           <div style="display:flex; flex-direction:column; align-items:center; gap:8px; min-width:130px;">
@@ -780,7 +789,7 @@ function renderizarRondaActual() {
           <div style="flex:1; min-width:140px; display:flex; align-items:center; gap:8px; justify-content:flex-end;">
             <div style="display:flex; flex-direction:column; align-items:flex-end;">
               <span style="font-weight:600; font-size:0.95rem; text-align:right;">${eq2Calculado}</span>
-              ${ronda === 'dieciseisavos' ? `<button class="edit-team-btn" onclick="window.abrirSeleccionEquipo('${p.id}', false)">✏️ Cambiar</button>` : ''}
+              <button class="edit-team-btn" onclick="window.abrirSeleccionEquipo('${p.id}', false)">✏️ Cambiar</button>
             </div>
             <img src="${getFlagUrl(eq2Calculado)}" style="width:32px; height:24px; border-radius:4px; object-fit:cover;" onerror="this.style.display='none'">
           </div>
@@ -2119,8 +2128,8 @@ function calcularEquipoBracketAdmin(partidoId, esEquipo1) {
     return esEquipo1 ? cached.eq1 : cached.eq2;
   }
   
-  // Fallback al placeholder original
-  return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  // Fallback dinamico (recursivo) en lugar de placeholder crudo
+  return calcularEquipoDinamico(partidoId, esEquipo1);
 }
 
 function calcularTodosEquiposBracket() {

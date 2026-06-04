@@ -1,8 +1,8 @@
 /* ranking.js - Tabla de posiciones en tiempo real, filtrado por institución */
 
-import { db } from './firebase-config.js?v=7.3';
+import { db } from './firebase-config.js?v=7.4';
 import { collection, query, getDocs, onSnapshot, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.3';
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.4';
 
 const user = requireAuth();
 if (!user) throw new Error("No autenticado");

@@ -1,9 +1,9 @@
 /* final.js - Fase Final: Sistema de pasos tipo cuestionario */
 
-import { db } from './firebase-config.js?v=7.3';
+import { db } from './firebase-config.js?v=7.4';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.3';
-import { BANDERAS } from './data.js?v=7.3';
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.4';
+import { BANDERAS } from './data.js?v=7.4';
 
 const user = requireAuth();
 if (!user) throw new Error("No autenticado");
@@ -385,6 +385,11 @@ function handleInputChange(e) {
     prediccionesLocales[id].ganador = '';
   }
   
+  // Si esta prediccion estaba previamente guardada, marcarla como "sucia" para re-guardar
+  if (prediccionesGuardadasIds.has(id)) {
+    prediccionesGuardadasIds.delete(id);
+  }
+  
   // Actualizar penales y ganador visualmente
   actualizarCardVisual(id);
   
@@ -650,6 +655,7 @@ async function guardarPredicciones(bloquear = false) {
   if (!institucion) {
     showAlert('Error: No hay institución seleccionada', 'danger');
     isSaving = false;
+    actualizarBotonesGuardado();
     return;
   }
   
@@ -664,7 +670,19 @@ async function guardarPredicciones(bloquear = false) {
     for (const [partidoId, preds] of Object.entries(prediccionesLocales)) {
       const g1 = preds.g1 !== '' ? parseInt(preds.g1) : null;
       const g2 = preds.g2 !== '' ? parseInt(preds.g2) : null;
-      if (g1 === null || g2 === null) continue;
+      
+      const docId = `${user.cedula}_${user.alias}_${institucion}_${partidoId}`;
+      const docRef = doc(db, 'predicciones_final', docId);
+      
+      // CASO BORRAR: Si estaba guardado pero ahora está vacío, borrar de Firestore
+      if (g1 === null || g2 === null) {
+        if (prediccionesGuardadasIds.has(partidoId)) {
+          batch.delete(docRef);
+          prediccionesGuardadasIds.delete(partidoId);
+          count++;
+        }
+        continue;
+      }
       
       const p1 = preds.p1 !== '' ? parseInt(preds.p1) : null;
       const p2 = preds.p2 !== '' ? parseInt(preds.p2) : null;
@@ -678,9 +696,7 @@ async function guardarPredicciones(bloquear = false) {
       const ganador = calcularGanadorAutomatico(partidoId);
       if (!ganador) continue;
       
-      // DocID incluye institución: cedula_alias_institucion_partidoId
-      const docId = `${user.cedula}_${user.alias}_${institucion}_${partidoId}`;
-      batch.set(doc(db, 'predicciones_final', docId), {
+      batch.set(docRef, {
         user_id: `${user.cedula}_${user.alias}`,
         institucion: institucion,
         partido_id: partidoId,
@@ -699,6 +715,8 @@ async function guardarPredicciones(bloquear = false) {
     if (count === 0) {
       showAlert('No hay nuevas predicciones para guardar', 'info');
       status.textContent = '';
+      isSaving = false;
+      actualizarBotonesGuardado();
       return;
     }
     
