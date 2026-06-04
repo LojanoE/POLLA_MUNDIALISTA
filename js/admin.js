@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.2';
+import { db } from './firebase-config.js?v=7.3';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.2';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.2';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.3';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.3';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -31,6 +31,7 @@ let prediccionesLocales = {};       // Para validaciones
 let rondaActualIndex = 0;
 let partidosFinalPorRonda = {};
 let isSaving = false;
+let equiposCalculadosAdmin = {}; // Cache de equipos reales para cada partido según resultados ingresados
 
 // ===== TOAST NOTIFICATIONS =====
 function showToast(title, message, type = 'info', duration = 5000) {
@@ -454,7 +455,14 @@ async function recalcularTodosLosPuntos() {
     });
     
     // Resolver nombre real de equipo (reemplaza placeholders con equipos reales del bracket)
-    const resolverEquipoReal = (partido, esEquipo1) => {
+    const resolverEquipoReal = (partido, esEquipo1, visited = new Set()) => {
+      const key = `${partido.id}_${esEquipo1}`;
+      if (visited.has(key)) {
+        // Ciclo detectado, devolver placeholder original
+        return esEquipo1 ? partido.equipo1 : partido.equipo2;
+      }
+      visited.add(key);
+      
       let nombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
       // Si no es placeholder, devolver directo
       if (!nombre || (!nombre.startsWith('Ganador') && !nombre.startsWith('Perdedor') && !/^[123][A-L]$/.test(nombre))) {
@@ -479,18 +487,18 @@ async function recalcularTodosLosPuntos() {
       const sp1 = sourcePartido.penales_equipo1;
       const sp2 = sourcePartido.penales_equipo2;
       let sGanador = null;
-      if (sg1 > sg2) sGanador = resolverEquipoReal(sourcePartido, true);
-      else if (sg2 > sg1) sGanador = resolverEquipoReal(sourcePartido, false);
+      if (sg1 > sg2) sGanador = resolverEquipoReal(sourcePartido, true, visited);
+      else if (sg2 > sg1) sGanador = resolverEquipoReal(sourcePartido, false, visited);
       else if (sp1 !== null && sp2 !== null && sp1 !== sp2) {
-        sGanador = sp1 > sp2 ? resolverEquipoReal(sourcePartido, true) : resolverEquipoReal(sourcePartido, false);
+        sGanador = sp1 > sp2 ? resolverEquipoReal(sourcePartido, true, visited) : resolverEquipoReal(sourcePartido, false, visited);
       }
       
       if (!sGanador) return nombre;
       
       const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
       if (esPerdedor) {
-        const eq1Real = resolverEquipoReal(sourcePartido, true);
-        return sGanador === eq1Real ? resolverEquipoReal(sourcePartido, false) : eq1Real;
+        const eq1Real = resolverEquipoReal(sourcePartido, true, visited);
+        return sGanador === eq1Real ? resolverEquipoReal(sourcePartido, false, visited) : eq1Real;
       }
       return sGanador;
     };
@@ -547,17 +555,22 @@ async function recalcularTodosLosPuntos() {
       puntosPorUsuario[u.id].puntosFinal = ptsFinal;
     }
     
-    // 7. Guardar puntos en Firestore
-    const batch = writeBatch(db);
-    for (const [userId, pts] of Object.entries(puntosPorUsuario)) {
-      const ref = doc(db, 'users', userId);
-      batch.update(ref, {
-        puntos_fase_grupos: pts.puntosGrupos,
-        puntos_fase_final: pts.puntosFinal,
-        puntos_total: pts.puntosGrupos + pts.puntosFinal
-      });
+    // 7. Guardar puntos en Firestore (múltiples batches si hay > 400 usuarios)
+    const entries = Object.entries(puntosPorUsuario);
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const chunk = entries.slice(i, i + BATCH_SIZE);
+      for (const [userId, pts] of chunk) {
+        const ref = doc(db, 'users', userId);
+        batch.update(ref, {
+          puntos_fase_grupos: pts.puntosGrupos,
+          puntos_fase_final: pts.puntosFinal,
+          puntos_total: pts.puntosGrupos + pts.puntosFinal
+        });
+      }
+      await batch.commit();
     }
-    await batch.commit();
     
     showToast('Puntos Recalculados', `Puntajes actualizados para ${usuarios.length} participantes`, 'success', 3000);
     
@@ -604,6 +617,7 @@ async function cargarPartidosFinal() {
     }
     
     await cargarPrediccionesUsuario();
+    recalcularTodosEquiposAdmin();
     renderizarRondaActual();
     actualizarUI();
     
@@ -624,6 +638,23 @@ async function cargarPrediccionesUsuario() {
   });
 }
 
+// Recalcula equipos reales para TODO el bracket (similar a final.js)
+function recalcularTodosEquiposAdmin() {
+  equiposCalculadosAdmin = {};
+  for (const ronda of RONDAS) {
+    for (const p of partidosFinalPorRonda[ronda]) {
+      if (ronda === 'dieciseisavos') {
+        equiposCalculadosAdmin[p.id] = { eq1: p.equipo1, eq2: p.equipo2 };
+      } else {
+        equiposCalculadosAdmin[p.id] = {
+          eq1: calcularEquipoDinamico(p.id, true),
+          eq2: calcularEquipoDinamico(p.id, false)
+        };
+      }
+    }
+  }
+}
+
 function calcularEquipoDinamico(partidoId, esEquipo1) {
   const partido = partidosFinalData.find(p => p.id === partidoId);
   if (!partido) return 'Por definir';
@@ -633,54 +664,48 @@ function calcularEquipoDinamico(partidoId, esEquipo1) {
     return esEquipo1 ? partido.equipo1 : partido.equipo2;
   }
   
-  // Extraer source del placeholder
-  let sourceId = null;
-  if (partido.ronda === 'tercer_lugar') {
-    sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
-  } else {
-    sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
+  // Si ya está en cache, usarlo
+  const cached = equiposCalculadosAdmin[partidoId];
+  if (cached) {
+    return esEquipo1 ? cached.eq1 : cached.eq2;
   }
   
+  let sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
   if (!sourceId) {
-    // Extraer del nombre del placeholder
     const equipoNombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
     const match = equipoNombre.match(/(F\d+)/);
     if (match) sourceId = match[1];
   }
-  
   if (!sourceId) return 'Por definir';
   
-  // Obtener resultado del partido source
-  const resultSource = resultadosFinal[sourceId];
-  if (!resultSource || resultSource.g1 === '' || resultSource.g2 === '') {
+  const resSource = resultadosFinal[sourceId];
+  const sourcePartido = partidosFinalData.find(p => p.id === sourceId);
+  if (!sourcePartido || !resSource || resSource.g1 === '' || resSource.g2 === '') {
     return esEquipo1 ? `Ganador ${sourceId}` : `Ganador ${sourceId}`;
   }
   
-  const g1 = parseInt(resultSource.g1);
-  const g2 = parseInt(resultSource.g2);
-  const p1 = resultSource.p1 !== '' ? parseInt(resultSource.p1) : null;
-  const p2 = resultSource.p2 !== '' ? parseInt(resultSource.p2) : null;
+  const g1 = parseInt(resSource.g1);
+  const g2 = parseInt(resSource.g2);
+  const p1 = resSource.p1 !== '' ? parseInt(resSource.p1) : null;
+  const p2 = resSource.p2 !== '' ? parseInt(resSource.p2) : null;
   
-  const sourcePartido = partidosFinalData.find(p => p.id === sourceId);
-  if (!sourcePartido) return 'Por definir';
+  // Resolver nombres reales del source recursivamente (usando cache si existe)
+  const eq1Source = equiposCalculadosAdmin[sourceId]?.eq1 || calcularEquipoDinamico(sourceId, true);
+  const eq2Source = equiposCalculadosAdmin[sourceId]?.eq2 || calcularEquipoDinamico(sourceId, false);
   
-  // Calcular ganador real
   let ganador = null;
-  if (g1 > g2) {
-    ganador = sourcePartido.equipo1;
-  } else if (g2 > g1) {
-    ganador = sourcePartido.equipo2;
-  } else if (p1 !== null && p2 !== null && p1 !== p2) {
-    ganador = p1 > p2 ? sourcePartido.equipo1 : sourcePartido.equipo2;
+  if (g1 > g2) ganador = eq1Source;
+  else if (g2 > g1) ganador = eq2Source;
+  else if (p1 !== null && p2 !== null && p1 !== p2) {
+    ganador = p1 > p2 ? eq1Source : eq2Source;
   }
   
   if (!ganador) return `Ganador ${sourceId}`;
   
-  // Para tercer lugar, devolver el perdedor
-  if (partido.ronda === 'tercer_lugar') {
-    return ganador === sourcePartido.equipo1 ? sourcePartido.equipo2 : sourcePartido.equipo1;
+  const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
+  if (esPerdedor) {
+    return ganador === eq1Source ? eq2Source : eq1Source;
   }
-  
   return ganador;
 }
 
@@ -856,7 +881,6 @@ function handleInputChange(e) {
   
   if (field === 'jugado') {
     resultadosFinal[id].jugado = e.target.checked;
-    // Actualizar visual del checkbox label
     const label = e.target.closest('label');
     if (label) {
       const span = label.querySelector('span');
@@ -865,14 +889,58 @@ function handleInputChange(e) {
         span.style.color = e.target.checked ? '#4caf50' : 'inherit';
       }
     }
+    actualizarEstadoBotonGuardar();
     return;
   }
   
   const value = e.target.value;
   resultadosFinal[id][field] = value;
   
+  // Auto-marcar como jugado si hay goles válidos
+  const pred = resultadosFinal[id];
+  if (pred && pred.g1 !== '' && pred.g2 !== '') {
+    const g1 = parseInt(pred.g1);
+    const g2 = parseInt(pred.g2);
+    // Solo auto-marcar si no es empate sin penales válidos
+    if (g1 !== g2 || (pred.p1 !== '' && pred.p2 !== '' && parseInt(pred.p1) !== parseInt(pred.p2))) {
+      pred.jugado = true;
+      // Actualizar checkbox visualmente
+      const card = document.querySelector(`.admin-match-input[data-id="${id}"]`);
+      if (card) {
+        const chk = card.querySelector('input[data-field="jugado"]');
+        if (chk) {
+          chk.checked = true;
+          const span = chk.closest('label')?.querySelector('span');
+          if (span) {
+            span.textContent = '✓ Jugado';
+            span.style.color = '#4caf50';
+          }
+        }
+      }
+    }
+  }
+  
   // Actualizar visualización de la card
   actualizarCardVisual(id);
+  actualizarEstadoBotonGuardar();
+  
+  // Recalcular equipos de todo el bracket si cambió un resultado de goles/penales
+  if (field === 'g1' || field === 'g2' || field === 'p1' || field === 'p2') {
+    recalcularTodosEquiposAdmin();
+    // Si estamos viendo una ronda posterior a la editada, re-renderizar para mostrar nuevos equipos
+    const partido = partidosFinalData.find(p => p.id === id);
+    if (partido) {
+      const rondaEditadaIdx = RONDAS.indexOf(partido.ronda);
+      if (rondaEditadaIdx < rondaActualIndex) {
+        renderizarRondaActual();
+      }
+    }
+    // Actualizar bracket visual si está abierto
+    const modalBracket = document.getElementById('modal-bracket');
+    if (modalBracket && modalBracket.style.display === 'flex') {
+      renderizarBracketAdmin();
+    }
+  }
 }
 
 function actualizarCardVisual(partidoId) {
@@ -978,34 +1046,35 @@ function actualizarEstadoBotonGuardar() {
   
   let incompletos = 0;
   let errores = 0;
+  let guardados = 0;
   
   for (const p of partidos) {
     const pred = resultadosFinal[p.id];
     if (!pred || pred.g1 === '' || pred.g2 === '') {
-      incompletos++;
-    } else {
-      const g1 = parseInt(pred.g1);
-      const g2 = parseInt(pred.g2);
-      if (g1 === g2) {
-        if (pred.p1 === '' || pred.p2 === '') errores++;
-        else if (parseInt(pred.p1) === parseInt(pred.p2)) errores++;
-      }
+      if (p.jugado) guardados++;
+      else incompletos++;
+      continue;
     }
+    const g1 = parseInt(pred.g1);
+    const g2 = parseInt(pred.g2);
+    if (g1 === g2) {
+      if (pred.p1 === '' || pred.p2 === '') { errores++; continue; }
+      if (parseInt(pred.p1) === parseInt(pred.p2)) { errores++; continue; }
+    }
+    guardados++;
   }
   
-  const jugados = partidos.filter(p => resultadosFinal[p.id]?.jugado).length;
+  // Botón siempre habilitado
+  btn.disabled = false;
   
   if (errores > 0) {
-    btn.disabled = true;
-    status.textContent = `⚠️ ${errores} partido(s) con errores en penales`;
+    status.textContent = `⚠️ ${errores} partido(s) con errores. Puedes guardar los válidos.`;
     status.style.color = 'var(--danger)';
   } else if (incompletos > 0) {
-    btn.disabled = true;
-    status.textContent = `${partidos.length - incompletos}/${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} completados`;
+    status.textContent = `${guardados}/${partidos.length} listos. Puedes guardar progreso parcial.`;
     status.style.color = 'var(--text-muted)';
   } else {
-    btn.disabled = false;
-    status.textContent = `✓ ${partidos.length} partidos de ${NOMBRES_RONDAS[ronda]} listos para guardar (incluye ${jugados} ya guardados)`;
+    status.textContent = `✓ ${partidos.length} partidos listos para guardar.`;
     status.style.color = '#4caf50';
   }
 }
@@ -1043,39 +1112,53 @@ document.getElementById('btn-save-round').addEventListener('click', async () => 
   const ronda = RONDAS[rondaActualIndex];
   const partidos = partidosFinalPorRonda[ronda] || [];
   
-  // Validar
-  let errores = 0;
+  // Contar cuántos tienen datos válidos para guardar y cuántos tienen errores
+  let validos = 0;
+  let incompletos = 0;
+  let erroresPenales = 0;
+  
   for (const p of partidos) {
     const pred = resultadosFinal[p.id];
     if (!pred || pred.g1 === '' || pred.g2 === '') {
-      errores++;
-    } else {
-      const g1 = parseInt(pred.g1);
-      const g2 = parseInt(pred.g2);
-      if (g1 === g2) {
-        if (pred.p1 === '' || pred.p2 === '' || parseInt(pred.p1) === parseInt(pred.p2)) {
-          errores++;
-        }
+      incompletos++;
+      continue;
+    }
+    const g1 = parseInt(pred.g1);
+    const g2 = parseInt(pred.g2);
+    if (g1 === g2) {
+      if (pred.p1 === '' || pred.p2 === '' || parseInt(pred.p1) === parseInt(pred.p2)) {
+        erroresPenales++;
+        continue;
       }
     }
+    validos++;
   }
   
-  if (errores > 0) {
+  if (validos === 0 && incompletos === partidos.length) {
     showModal({
       icon: '⚠️',
-      title: 'No se puede guardar',
-      message: `Hay ${errores} partido(s) con errores o incompletos. Corrige los errores antes de guardar.`,
+      title: 'Sin datos para guardar',
+      message: 'No hay resultados ingresados en esta ronda. Ingresa al menos un marcador antes de guardar.',
       btnPrimaryText: 'Entendido',
-      btnPrimaryClass: 'btn btn-warning'
+      btnPrimaryClass: 'btn btn-primary'
     });
     return;
   }
   
-  // Confirmación
+  // Confirmación con detalle de guardado parcial
+  let msg = `Se guardarán <b>${validos} partido(s)</b> de ${NOMBRES_RONDAS[ronda]}.`;
+  if (erroresPenales > 0) {
+    msg += `<br><br>⚠️ ${erroresPenales} partido(s) con errores en penales NO se guardarán.`;
+  }
+  if (incompletos > 0) {
+    msg += `<br>ℹ️ ${incompletos} partido(s) vacíos NO se guardarán (ni borrarán).`;
+  }
+  msg += '<br><br>Los puntos de todos los participantes se recalcularán automáticamente.';
+  
   showModal({
     icon: '💾',
     title: `¿Guardar Resultados de ${NOMBRES_RONDAS[ronda]}?`,
-    message: `Se guardarán los resultados de <b>${partidos.length} partidos</b>.<br><br>Los puntos de todos los participantes se recalcularán automáticamente.`,
+    message: msg,
     btnPrimaryText: '✅ Confirmar y Guardar',
     btnPrimaryClass: 'btn btn-success',
     btnSecondaryText: 'Cancelar',
@@ -1099,18 +1182,49 @@ async function guardarRondaActual() {
     const batch = writeBatch(db);
     const ronda = RONDAS[rondaActualIndex];
     const partidos = partidosFinalPorRonda[ronda] || [];
-    let count = 0;
+    let countGuardados = 0;
+    let countBorrados = 0;
+    let errores = [];
     
     for (const p of partidos) {
       const pred = resultadosFinal[p.id];
-      if (!pred || pred.g1 === '' || pred.g2 === '') continue;
+      const ref = doc(db, 'partidos_final', p.id);
+      
+      // CASO 1: Ambos goles vacíos -> borrar resultado si existía
+      if (!pred || pred.g1 === '' || pred.g2 === '') {
+        if (p.jugado) {
+          batch.update(ref, {
+            goles_equipo1: null,
+            goles_equipo2: null,
+            penales_equipo1: null,
+            penales_equipo2: null,
+            ganador: null,
+            jugado: false
+          });
+          resultadosFinal[p.id].jugado = false;
+          countBorrados++;
+        }
+        continue;
+      }
       
       const g1 = parseInt(pred.g1);
       const g2 = parseInt(pred.g2);
       const p1 = pred.p1 !== '' ? parseInt(pred.p1) : null;
       const p2 = pred.p2 !== '' ? parseInt(pred.p2) : null;
       
-      // Determinar ganador
+      // CASO 2: Empate sin penales válidos -> error, no guardar
+      if (g1 === g2) {
+        if (p1 === null || p2 === null) {
+          errores.push(`${p.id}: empate sin penales definidos`);
+          continue;
+        }
+        if (p1 === p2) {
+          errores.push(`${p.id}: penales iguales (${p1}-${p2})`);
+          continue;
+        }
+      }
+      
+      // CASO 3: Resultado válido -> guardar y auto-marcar como jugado
       let ganador = null;
       if (g1 > g2) {
         ganador = 'equipo1';
@@ -1120,31 +1234,38 @@ async function guardarRondaActual() {
         ganador = p1 > p2 ? 'equipo1' : 'equipo2';
       }
       
-      const ref = doc(db, 'partidos_final', p.id);
       const updateData = {
         goles_equipo1: g1,
         goles_equipo2: g2,
         ganador: ganador,
-        jugado: resultadosFinal[p.id]?.jugado || false
+        jugado: true
       };
       
-      if (p1 !== null) updateData.penales_equipo1 = p1;
-      if (p2 !== null) updateData.penales_equipo2 = p2;
+      // Si hay empate con penales, guardarlos; si no, limpiar penales anteriores
+      if (g1 === g2) {
+        updateData.penales_equipo1 = p1;
+        updateData.penales_equipo2 = p2;
+      } else {
+        updateData.penales_equipo1 = null;
+        updateData.penales_equipo2 = null;
+      }
       
       batch.update(ref, updateData);
-      count++;
+      resultadosFinal[p.id].jugado = true;
+      countGuardados++;
     }
     
-    if (count === 0) {
+    if (countGuardados === 0 && countBorrados === 0) {
       showModal({
         icon: '⚠️',
         title: 'Sin cambios',
-        message: 'No hay resultados nuevos para guardar.',
+        message: 'No hay resultados válidos para guardar.' + (errores.length ? `<br><br>Errores:<br>${errores.join('<br>')}` : ''),
         btnPrimaryText: 'Entendido',
         btnPrimaryClass: 'btn btn-primary'
       });
       isSaving = false;
       btn.disabled = false;
+      actualizarEstadoBotonGuardar();
       return;
     }
     
@@ -1155,13 +1276,20 @@ async function guardarRondaActual() {
     await recalcularTodosLosPuntos();
     
     // Actualizar visualización
+    recalcularTodosEquiposAdmin();
     renderizarRondaActual();
     actualizarUI();
+    
+    let msg = `Se guardaron <b>${countGuardados} partido(s)</b>`;
+    if (countBorrados > 0) msg += ` y se borraron <b>${countBorrados} partido(s)</b>`;
+    msg += ` de ${NOMBRES_RONDAS[ronda]}.`;
+    if (errores.length > 0) msg += `<br><br>⚠️ ${errores.length} partido(s) con errores no se guardaron:<br>${errores.join('<br>')}`;
+    msg += '<br><br>✅ Los puntos han sido recalculados.';
     
     showModal({
       icon: '✅',
       title: '¡Guardado Exitoso!',
-      message: `Se guardaron los resultados de <b>${count} partidos</b> de ${NOMBRES_RONDAS[ronda]}.<br><br>✅ Los puntos de todos los participantes han sido recalculados.`,
+      message: msg,
       btnPrimaryText: 'Continuar',
       btnPrimaryClass: 'btn btn-success'
     });
@@ -1985,39 +2113,14 @@ function calcularEquipoBracketAdmin(partidoId, esEquipo1) {
     return esEquipo1 ? partido.equipo1 : partido.equipo2;
   }
   
-  let sourceId = esEquipo1 ? partido.source_equipo1 : partido.source_equipo2;
-  if (!sourceId) {
-    const nombre = esEquipo1 ? partido.equipo1 : partido.equipo2;
-    const match = nombre.match(/(F\d+)/);
-    if (match) sourceId = match[1];
-  }
-  if (!sourceId) return esEquipo1 ? partido.equipo1 : partido.equipo2;
-  
-  const resSource = resultadosFinal[sourceId];
-  const sourcePartido = partidosFinalData.find(p => p.id === sourceId);
-  if (!sourcePartido || !resSource || resSource.g1 === '' || resSource.g2 === '') {
-    return esEquipo1 ? partido.equipo1 : partido.equipo2;
+  // Usar cache de equipos calculados si existe
+  const cached = equiposCalculadosAdmin[partidoId];
+  if (cached) {
+    return esEquipo1 ? cached.eq1 : cached.eq2;
   }
   
-  const g1 = parseInt(resSource.g1);
-  const g2 = parseInt(resSource.g2);
-  const p1 = resSource.p1 !== '' ? parseInt(resSource.p1) : null;
-  const p2 = resSource.p2 !== '' ? parseInt(resSource.p2) : null;
-  
-  let ganador = null;
-  if (g1 > g2) ganador = sourcePartido.equipo1;
-  else if (g2 > g1) ganador = sourcePartido.equipo2;
-  else if (p1 !== null && p2 !== null && p1 !== p2) {
-    ganador = p1 > p2 ? sourcePartido.equipo1 : sourcePartido.equipo2;
-  }
-  
-  if (!ganador) return esEquipo1 ? partido.equipo1 : partido.equipo2;
-  
-  const esPerdedor = (esEquipo1 ? partido.perdedor_source1 : partido.perdedor_source2) || partido.ronda === 'tercer_lugar';
-  if (esPerdedor) {
-    return ganador === sourcePartido.equipo1 ? sourcePartido.equipo2 : sourcePartido.equipo1;
-  }
-  return ganador;
+  // Fallback al placeholder original
+  return esEquipo1 ? partido.equipo1 : partido.equipo2;
 }
 
 function calcularTodosEquiposBracket() {

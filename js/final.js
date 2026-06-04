@@ -1,9 +1,9 @@
 /* final.js - Fase Final: Sistema de pasos tipo cuestionario */
 
-import { db } from './firebase-config.js?v=7.2';
+import { db } from './firebase-config.js?v=7.3';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.2';
-import { BANDERAS } from './data.js?v=7.2';
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.3';
+import { BANDERAS } from './data.js?v=7.3';
 
 const user = requireAuth();
 if (!user) throw new Error("No autenticado");
@@ -367,7 +367,7 @@ function renderFlag(equipo) {
 
 function attachInputListeners(container) {
   container.querySelectorAll('input:not([disabled])').forEach(el => {
-    el.addEventListener('change', handleInputChange);
+    // Solo usar 'input' para evitar doble ejecución; cubre tanto typing como paste
     el.addEventListener('input', handleInputChange);
   });
 }
@@ -662,8 +662,6 @@ async function guardarPredicciones(bloquear = false) {
     let count = 0;
     
     for (const [partidoId, preds] of Object.entries(prediccionesLocales)) {
-      if (prediccionesGuardadasIds.has(partidoId)) continue;
-      
       const g1 = preds.g1 !== '' ? parseInt(preds.g1) : null;
       const g2 = preds.g2 !== '' ? parseInt(preds.g2) : null;
       if (g1 === null || g2 === null) continue;

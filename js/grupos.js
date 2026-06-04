@@ -1,9 +1,9 @@
 /* grupos.js - Fase de Grupos: carga partidos y guarda predicciones por institución */
 
-import { db } from './firebase-config.js?v=7.2';
+import { db } from './firebase-config.js?v=7.3';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.2';
-import { BANDERAS, GRUPOS } from './data.js?v=7.2';
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.3';
+import { BANDERAS, GRUPOS } from './data.js?v=7.3';
 
 // Verificar sesión
 const user = requireAuth();

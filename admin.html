@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel Admin - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=7.2">
+  <link rel="stylesheet" href="css/styles.css?v=7.3">
   <style>
     .toast-container {
       position: fixed;
@@ -382,8 +382,17 @@
     
     <h2 style="color: var(--accent); margin-bottom: 30px; text-align: center;">⚙️ Panel de Administrador</h2>
     
+    <!-- Navegación Rápida -->
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 25px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid var(--border);">
+      <a href="#sec-generar-final" class="btn btn-primary" style="padding: 8px 14px; font-size: 0.85rem;">⚙️ Generar Fase Final</a>
+      <a href="#sec-fase-final" class="btn btn-success" style="padding: 8px 14px; font-size: 0.85rem;">🏆 Ingresar Resultados Fase Final</a>
+      <a href="#sec-grupos" class="btn btn-info" style="padding: 8px 14px; font-size: 0.85rem;">⚽ Ingresar Resultados Grupos</a>
+      <a href="#sec-usuarios" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem;">👥 Gestión Usuarios</a>
+      <a href="#sec-instituciones" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem;">🏢 Instituciones</a>
+    </div>
+    
     <!-- Inicializar Base de Datos -->
-    <div class="admin-section">
+    <div class="admin-section" id="sec-init-db">
       <h3>🗃️ Inicializar Base de Datos</h3>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
         Carga todos los partidos de la fase de grupos y fase final en Firebase. Ejecuta esto solo una vez al inicio del torneo.
@@ -394,7 +403,7 @@
     </div>
     
     <!-- Control de Fase Final -->
-    <div class="admin-section">
+    <div class="admin-section" id="sec-control-fases">
       <h3>🎮 Control de Fases</h3>
       <div class="toggle-container" style="margin-bottom: 20px;">
         <span>Habilitar Fase Final para predicciones:</span>
@@ -407,7 +416,7 @@
     </div>
     
     <!-- Gestión de Instituciones -->
-    <div class="admin-section">
+    <div class="admin-section" id="sec-instituciones">
       <h3>🏢 Gestión de Instituciones</h3>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
         Administra las instituciones participantes. Solo las instituciones activas aparecen en el login.
@@ -421,7 +430,7 @@
     </div>
     
     <!-- Generar Fase Final Automáticamente -->
-    <div class="admin-section">
+    <div class="admin-section" id="sec-generar-final">
       <h3>⚙️ Generar Fase Final</h3>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
         Después de ingresar todos los resultados de la fase de grupos, presiona este botón para calcular automáticamente quién clasificó y rellenar los 16 partidos de dieciseisavos con los equipos reales.
@@ -429,11 +438,14 @@
       <button id="btn-generar-fase-final" class="btn btn-primary" style="margin-bottom: 15px;">⚙️ Generar Fase Final Automáticamente</button>
       <div id="tabla-grupos-preview" style="display: none; margin-top: 20px;"></div>
       <div id="mejores-terceros-preview" style="display: none; margin-top: 20px;"></div>
+      <div style="margin-top: 15px; text-align: center;">
+        <a href="#sec-fase-final" class="btn btn-success" style="padding: 10px 20px; font-size: 0.9rem;">🏆 Ir a Ingresar Resultados de Fase Final →</a>
+      </div>
       <div id="generar-status" style="margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;"></div>
     </div>
     
     <!-- Gestión de Usuarios -->
-    <div class="admin-section">
+    <div class="admin-section" id="sec-usuarios">
       <h3>👥 Gestión de Usuarios</h3>
       <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
         <input type="text" id="search-cedula" placeholder="Buscar por cédula..." style="padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); flex: 1; min-width: 200px;">
@@ -456,7 +468,7 @@
     </div>
     
     <!-- Resultados Fase de Grupos -->
-    <div class="admin-section">
+    <div class="admin-section" id="sec-grupos">
       <h3 id="grupos-title">⚽ Ingresar Resultados - Fase de Grupos</h3>
       <div id="admin-grupos-container"></div>
       <div style="text-align: center; margin-top: 20px;">
@@ -465,7 +477,7 @@
     </div>
     
     <!-- Nueva Sección: Resultados Fase Final with Wizard -->
-    <div class="admin-section" id="fase-final-section">
+    <div class="admin-section" id="sec-fase-final">
       <h3>🏆 Ingresar Resultados - Fase Final</h3>
       <div style="text-align: center; margin-bottom: 15px;">
         <button id="btn-ver-bracket" class="btn btn-info" style="padding: 10px 20px; font-size: 0.9rem;">🌳 Ver Bracket Completo</button>
@@ -824,11 +836,11 @@
   </style>
 
   <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px;">
-    Polla Mundialista 2026 - v7.2
+    Polla Mundialista 2026 - v7.3
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script type="module" src="js/admin.js?v=7.2"></script>
+  <script type="module" src="js/admin.js?v=7.3"></script>
 </body>
 </html>
