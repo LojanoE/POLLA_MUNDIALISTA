@@ -16,7 +16,7 @@ Vanilla HTML/CSS/JS frontend for a soccer-prediction pool (bracket pool). No bui
 | `grupos.html` + `js/grupos.js` | Participants predict group-stage match scores (72 matches, 12 groups) |
 | `final.html` + `js/final.js` | **Bracket pool:** Participants predict ALL 32 knockout matches (16avos → 8vos → 4tos → semis → 3er lugar → final). Dynamic team calculation based on user's own predictions. |
 | `admin.html` + `js/admin.js` | Admin enters real results, **generates knockout bracket automatically from group results**, enables final phase, recalculates scores, manages users and institutions |
-| `ranking.html` + `js/ranking.js` | Two separate leaderboards: one for group-stage points and one for knockout-stage points, both filterable by institution |
+| `ranking.html` + `js/ranking.js` | Two separate leaderboards displayed one below the other: one for group-stage points (`puntos_fase_grupos`) and one for knockout-stage points (`puntos_fase_final`), both filterable by institution |
 | `reglas.html` + `js/reglas.js` | Rules page visible to all users (no auth required) |
 | `init-db.html` | One-time setup page that seeds Firestore with all matches, config, and default institution |
 | `diagnostico.html` | Firebase connection diagnostic tool |
