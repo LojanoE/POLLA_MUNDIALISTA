@@ -44,6 +44,7 @@ function getFlagUrl(pais) {
 let partidosData = [];
 let prediccionesLocales = {};
 let prediccionesGuardadasIds = new Set();
+let prediccionesGruposAbiertas = true;
 
 // Cargar partidos desde Firestore
 async function cargarPartidos() {
@@ -51,6 +52,17 @@ async function cargarPartidos() {
   container.innerHTML = '<div class="spinner"></div>';
   
   try {
+    // Verificar si predicciones están abiertas
+    try {
+      const configRef = doc(db, 'config', 'app_config');
+      const configSnap = await getDoc(configRef);
+      if (configSnap.exists()) {
+        prediccionesGruposAbiertas = configSnap.data().predicciones_grupos_abiertas !== false;
+      }
+    } catch (e) {
+      console.warn('No se pudo leer config', e);
+    }
+    
     const q = query(collection(db, 'partidos_grupos'));
     const snapshot = await getDocs(q);
     partidosData = [];
@@ -106,8 +118,8 @@ function renderizarGrupos() {
       
       const jugado = partido.jugado;
       const yaGuardado = prediccionesGuardadasIds.has(partido.id);
-      // Solo bloquear si el partido YA SE JUGÓ (no si solo está guardado)
-      const bloqueado = jugado;
+      // Bloquear si el partido YA SE JUGÓ o si el plazo de predicciones cerró
+      const bloqueado = jugado || !prediccionesGruposAbiertas;
       const disabled = bloqueado ? 'disabled' : '';
       
       if (!bloqueado) tienePartidosEditables = true;
@@ -160,13 +172,21 @@ function renderizarGrupos() {
     });
   });
   
-  // Deshabilitar botón si no hay partidos editables
+  // Deshabilitar botón si no hay partidos editables o si el plazo cerró
   const btnSave = document.getElementById('btn-save');
-  if (!tienePartidosEditables) {
+  const plazoCerradoMsg = document.getElementById('plazo-cerrado-msg');
+  if (plazoCerradoMsg) {
+    plazoCerradoMsg.style.display = prediccionesGruposAbiertas ? 'none' : 'block';
+  }
+  if (!tienePartidosEditables || !prediccionesGruposAbiertas) {
     btnSave.disabled = true;
-    btnSave.textContent = '✓ Partidos cerrados (ya jugados)';
+    btnSave.textContent = '✓ Predicciones cerradas';
     btnSave.style.opacity = '0.6';
-    document.getElementById('save-status').textContent = 'Los partidos de esta fase ya se jugaron. No se pueden editar predicciones.';
+    if (!prediccionesGruposAbiertas) {
+      document.getElementById('save-status').textContent = 'El plazo para ingresar predicciones ha cerrado.';
+    } else {
+      document.getElementById('save-status').textContent = 'Los partidos de esta fase ya se jugaron. No se pueden editar predicciones.';
+    }
   } else {
     btnSave.disabled = false;
     btnSave.textContent = '💾 Guardar Predicciones';
@@ -213,6 +233,11 @@ async function guardarPredicciones() {
   const status = document.getElementById('save-status');
   const user = getCurrentUser();
   const institucion = getInstitucionActiva();
+  
+  if (!prediccionesGruposAbiertas) {
+    showAlert('El plazo para ingresar predicciones ha cerrado', 'warning');
+    return;
+  }
   
   if (!institucion) {
     showAlert('Error: No hay institución seleccionada', 'danger');

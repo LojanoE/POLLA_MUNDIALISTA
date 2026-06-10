@@ -43,6 +43,7 @@ let equiposCalculados = {};      // { partidoId: { eq1, eq2 } }
 let rondaActualIndex = 0;
 let partidosPorRonda = {};
 let isSaving = false;
+let prediccionesFinalAbiertas = true;
 
 // ===== UTILIDADES =====
 function showAlert(msg, type) {
@@ -91,6 +92,22 @@ async function cargarPartidosFinal() {
   if (!habilitada) return;
   
   try {
+    // Verificar si predicciones de fase final están abiertas
+    try {
+      const configRef = doc(db, 'config', 'app_config');
+      const configSnap = await getDoc(configRef);
+      if (configSnap.exists()) {
+        prediccionesFinalAbiertas = configSnap.data().predicciones_final_abiertas !== false;
+      }
+    } catch (e) {
+      console.warn('No se pudo leer config', e);
+    }
+    
+    const plazoCerradoMsg = document.getElementById('plazo-cerrado-msg');
+    if (plazoCerradoMsg) {
+      plazoCerradoMsg.style.display = prediccionesFinalAbiertas ? 'none' : 'block';
+    }
+    
     const q = query(collection(db, 'partidos_final'));
     const snapshot = await getDocs(q);
     partidosFinal = [];
@@ -281,8 +298,8 @@ function renderizarRondaActual() {
     const eq2 = equiposCalculados[p.id]?.eq2 || p.equipo2;
     const yaGuardado = prediccionesGuardadasIds.has(p.id);
     const jugado = p.jugado;
-    // Solo bloquear si el partido YA SE JUGÓ (no si solo está guardado)
-    const disabled = jugado ? 'disabled' : '';
+    // Bloquear si el partido YA SE JUGÓ o si el plazo de predicciones cerró
+    const disabled = (jugado || !prediccionesFinalAbiertas) ? 'disabled' : '';
     const pred = prediccionesLocales[p.id] || {};
     const g1 = pred.g1 ?? '';
     const g2 = pred.g2 ?? '';
@@ -544,7 +561,12 @@ function actualizarBotonesGuardado() {
   const todoCompleto = completados === total;
   const todoGuardado = guardados === total;
   
-  if (todoGuardado) {
+  if (!prediccionesFinalAbiertas) {
+    btnFinal.disabled = true;
+    btnFinal.textContent = '🔒 Predicciones cerradas';
+    btnProgress.style.display = 'none';
+    status.textContent = 'El plazo para ingresar predicciones ha cerrado.';
+  } else if (todoGuardado) {
     btnFinal.disabled = true;
     btnFinal.textContent = '✅ Todo Guardado';
     btnProgress.style.display = 'none';
@@ -651,6 +673,13 @@ async function guardarPredicciones(bloquear = false) {
   const status = document.getElementById('save-status');
   const user = getCurrentUser();
   const institucion = getInstitucionActiva();
+  
+  if (!prediccionesFinalAbiertas) {
+    showAlert('El plazo para ingresar predicciones ha cerrado', 'warning');
+    isSaving = false;
+    actualizarBotonesGuardado();
+    return;
+  }
   
   if (!institucion) {
     showAlert('Error: No hay institución seleccionada', 'danger');

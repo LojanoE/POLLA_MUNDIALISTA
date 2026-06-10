@@ -184,6 +184,12 @@ async function checkFaseFinalHabilitada() {
     const data = configSnap.data();
     document.getElementById('toggle-fase-final').checked = !!data.fase_final_habilitada;
     document.getElementById('status-fase-final').textContent = data.fase_final_habilitada ? 'Habilitada' : 'Deshabilitada';
+    const gruposAbiertas = data.predicciones_grupos_abiertas !== false;
+    const finalAbiertas = data.predicciones_final_abiertas !== false;
+    document.getElementById('toggle-predicciones-grupos').checked = gruposAbiertas;
+    document.getElementById('status-predicciones-grupos').textContent = gruposAbiertas ? 'Abierto' : 'Cerrado';
+    document.getElementById('toggle-predicciones-final').checked = finalAbiertas;
+    document.getElementById('status-predicciones-final').textContent = finalAbiertas ? 'Abierto' : 'Cerrado';
   }
 }
 
@@ -300,6 +306,32 @@ document.getElementById('toggle-fase-final').addEventListener('change', async (e
     await setDoc(configRef, { fase_final_habilitada: e.target.checked }, { merge: true });
     document.getElementById('status-fase-final').textContent = e.target.checked ? 'Habilitada' : 'Deshabilitada';
     showToast('Éxito', `Fase final ${e.target.checked ? 'habilitada' : 'deshabilitada'}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo cambiar el estado', 'error');
+  }
+});
+
+// Toggle predicciones grupos
+document.getElementById('toggle-predicciones-grupos').addEventListener('change', async (e) => {
+  try {
+    const configRef = doc(db, 'config', 'app_config');
+    await setDoc(configRef, { predicciones_grupos_abiertas: e.target.checked }, { merge: true });
+    document.getElementById('status-predicciones-grupos').textContent = e.target.checked ? 'Abierto' : 'Cerrado';
+    showToast('Éxito', `Predicciones de grupos ${e.target.checked ? 'abiertas' : 'cerradas'}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo cambiar el estado', 'error');
+  }
+});
+
+// Toggle predicciones final
+document.getElementById('toggle-predicciones-final').addEventListener('change', async (e) => {
+  try {
+    const configRef = doc(db, 'config', 'app_config');
+    await setDoc(configRef, { predicciones_final_abiertas: e.target.checked }, { merge: true });
+    document.getElementById('status-predicciones-final').textContent = e.target.checked ? 'Abierto' : 'Cerrado';
+    showToast('Éxito', `Predicciones de fase final ${e.target.checked ? 'abiertas' : 'cerradas'}`, 'success');
   } catch (err) {
     console.error(err);
     showToast('Error', 'No se pudo cambiar el estado', 'error');
