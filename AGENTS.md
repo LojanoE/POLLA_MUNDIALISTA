@@ -46,7 +46,7 @@ Cada página HTML carga su propio módulo JS con `<script type="module" src="js/
 | `index.html` | Login de participantes (cédula + alias + institución) y toggle para login de administrador. |
 | `grupos.html` + `js/grupos.js` | Pantalla de predicciones de la fase de grupos (72 partidos). |
 | `final.html` + `js/final.js` | Pantalla de predicciones de la fase final: wizard de 6 pasos (16avos → 8vos → 4tos → semis → 3er lugar → final) con cálculo dinámico de equipos según los propios pronósticos del participante. |
-| `admin.html` + `js/admin.js` | Panel de administración: inicializar BD, reiniciar, ingresar resultados reales, generar fase final, habilitar fase final, recalcular puntajes, gestionar usuarios e instituciones, exportar respaldo ZIP/PDF. |
+| `admin.html` + `js/admin.js` | Panel de administración: inicializar BD, reiniciar, ingresar resultados reales, generar fase final, habilitar fase final, **abrir/cerrar recepción de predicciones**, recalcular puntajes, gestionar usuarios e instituciones, exportar respaldo ZIP/PDF. |
 | `ranking.html` + `js/ranking.js` | Rankings separados: puntos de fase de grupos (`puntos_fase_grupos`) y puntos de fase final (`puntos_fase_final`), con filtro por institución. |
 | `reglas.html` + `js/reglas.js` | Página pública de reglas; no requiere auth. |
 | `init-db.html` | Herramienta de setup único: carga en Firestore los 72 partidos de grupos, los 32 partidos de la fase final, la institución por defecto (`GDR`) y la configuración inicial. |
@@ -254,9 +254,11 @@ La estrategia de prueba es 100% manual y se apoya en tres páginas de soporte:
 - El admin completa goles en los inputs de `admin.html` y presiona "Guardar Resultados - Fase de Grupos".
 - Se marcan automáticamente como `jugado: true` los partidos válidos.
 - Al finalizar se ejecuta `recalcularTodosLosPuntos()`.
+- **Nota:** el admin puede seguir ingresando resultados reales aunque el toggle "Recibir predicciones de Fase de Grupos" esté cerrado; ese toggle solo afecta a los participantes.
 
 **Fase final:**
 - Wizard de 6 pasos (`guardarRondaActual()`).
+- **Nota:** el admin puede seguir ingresando resultados reales aunque el toggle "Recibir predicciones de Fase Final" esté cerrado; ese toggle solo afecta a los participantes.
 - Permite guardado parcial: solo se persisten los partidos válidos; los errores se reportan.
 - Se pueden borrar resultados vaciando los inputs.
 - Se limpian campos de penales cuando un partido deja de ser empate.
