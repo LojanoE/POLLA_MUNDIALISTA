@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ranking - Polla Mundialista 2026</title>
-  <link rel="stylesheet" href="css/styles.css?v=7.5">
+  <link rel="stylesheet" href="css/styles.css?v=7.9">
 </head>
 <body>
 
@@ -42,7 +42,18 @@
     </div>
     
     <div id="alert-box" class="alert"></div>
-    
+
+    <!-- Avance del Torneo -->
+    <div id="avance-torneo" style="margin-bottom: 40px; padding: 20px; background: rgba(168,213,186,0.08); border-radius: 12px; border: 1px solid rgba(168,213,186,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+        <h3 style="color: var(--accent); margin:0;">📈 Avance del Torneo</h3>
+        <span id="avance-texto" style="color: var(--text-muted); font-size:0.9rem;">Cargando...</span>
+      </div>
+      <div style="width:100%; height:18px; background:rgba(255,255,255,0.08); border-radius:10px; overflow:hidden;">
+        <div id="avance-barra" style="height:100%; width:0%; background:linear-gradient(90deg, var(--accent), #6bbf8a); border-radius:10px; transition: width 0.6s ease;"></div>
+      </div>
+    </div>
+
     <!-- Ranking Fase de Grupos -->
     <div style="margin-bottom: 40px;">
       <h3 style="color: var(--accent); text-align: center; margin-bottom: 15px;">⚽ Ranking Fase de Grupos</h3>
@@ -65,7 +76,13 @@
     
     <!-- Ranking Fase Final -->
     <div style="margin-bottom: 40px;">
-      <h3 style="color: var(--accent); text-align: center; margin-bottom: 15px;">🏆 Ranking Fase Final</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+        <h3 style="color: var(--accent); margin:0;">🏆 Ranking Fase Final</h3>
+        <button id="btn-recalc-prob" style="padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:rgba(168,213,186,0.15); color:var(--accent); cursor:pointer; font-weight:bold; font-size:0.85rem;">🔄 Recalcular probabilidades</button>
+      </div>
+      <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-bottom:15px;">
+        La columna <b>Prob%</b> es la probabilidad estimada de ganar la Fase Final vía simulación Monte Carlo (1000 iter). Valores orientativos.
+      </p>
       <div style="overflow-x: auto;">
         <table class="ranking-table">
           <thead>
@@ -74,10 +91,11 @@
               <th>Alias</th>
               <th class="inst-col-header" style="display:none;">Institución</th>
               <th>Pts Fase Final</th>
+              <th title="Probabilidad estimada de ganar la Fase Final (Monte Carlo, 1000 iter)" style="cursor:help;">Prob%</th>
             </tr>
           </thead>
           <tbody id="ranking-final-body">
-            <tr><td colspan="3" style="text-align:center; padding:30px;"><div class="spinner"></div></td></tr>
+            <tr><td colspan="4" style="text-align:center; padding:30px;"><div class="spinner"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -85,9 +103,9 @@
   </div>
 
   <footer style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px;">
-    Polla Mundialista 2026 - v7.5
+    Polla Mundialista 2026 - v7.9
   </footer>
 
-  <script type="module" src="js/ranking.js?v=7.5"></script>
+  <script type="module" src="js/ranking.js?v=7.9"></script>
 </body>
 </html>
