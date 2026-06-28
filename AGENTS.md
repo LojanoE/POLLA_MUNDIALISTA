@@ -20,7 +20,8 @@ Static frontend (no build, no framework) for a World Cup 2026 prediction pool (4
 
 Every HTML `<link>`/`<script>` and every local JS `import` appends `?v=N`. Imports of remote Firebase/CDN URLs do **not** take a version. Bump the version in **all** `?v=` occurrences when making structural changes.
 
-- **`?v=7.5`** baseline (grupos, index, init-db, simular-grupos, reglas, diagnostico, ranking-style-only — but ranking's own script is at 7.9).
+- **`?v=7.5`** baseline (grupos, index, init-db, simular-grupos, diagnostico, ranking-style-only — but ranking's own script is at 7.9).
+- `reglas.html` + `js/reglas.js` → **`?v=7.6`** (fase final: marcador incluye prórroga; fix texto predicciones).
 - `final.html` + `js/final.js` → **`?v=7.6`** (edit-after-save flow fix; see §6).
 - `admin.html` + `js/admin.js` → **`?v=7.10`** (PDF predicciones: equipos predichos + columna PENALES; see §11. Fix 7.10: ids defensivos para users sin `cedula`/`alias` en el doc).
 - `ranking.html` + `js/ranking.js` → **`?v=7.9`** (Avance del Torneo + Prob% Monte Carlo; see §11).
@@ -76,8 +77,8 @@ Implemented in `admin.js:recalcularTodosLosPuntos()` and documented in `reglas.h
 - Acierta ganador o empate (no exacto): **1 pt**.
 
 **Fase Final (`admin.js:574-587`):**
-- Marcador exacto a 90 min: **3 pts**.
-- Acierta ganador/empate a 90 min (no exacto): **1 pt**.
+- Marcador exacto del partido (el admin ingresa el resultado final; en fase final eso incluye la prórroga si la hubo): **3 pts**.
+- Acierta ganador/empate del partido (no exacto): **1 pt**.
 - Acierta el equipo clasificado (`pred.prediccion_ganador === realGanador`): **1 pt**.
 - **Cap 4 pts por partido.**
 - Penales solo desempatan al clasificado; no suman.
@@ -96,7 +97,6 @@ If you change scoring, update `reglas.html`, `admin.js`, and this file together 
 
 ## 9. Known inconsistencies (verify before "fixing")
 
-- `reglas.html` says "Las predicciones se cierran al guardar" — **false**: code never locks predictions after save; only `predicciones_*_abiertas` (admin toggles) or `jugado` per match disables inputs.
 - `ranking.js` gates admin tabs by `user.alias === 'ADMIN'`, but admin session stores `alias: 'Administrador'` — admin-specific ranking UI never shows. Intentional or not is unclear.
 - `index.html` loads **all** institutions without filtering `activo !== false`.
 - `init-db.html` imports `./js/firebase-config.js` **without `?v=N`** — cache-bust inconsistency.
@@ -140,4 +140,4 @@ When making JS changes to a page, bump that page's `?v=` (and any inline imports
 
 ---
 
-Última actualización: 2026-06-28 (§3 admin v7.10 fix ids indefensivos; §11 PDF export + MC ranking).
+Última actualización: 2026-06-28 (§3 admin v7.10 fix ids indefensivos; §11 PDF export + MC ranking; §7 reglas v7.6 fase final incluye prórroga).

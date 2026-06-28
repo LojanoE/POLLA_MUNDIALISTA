@@ -1992,7 +1992,7 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
           const ec = equiposCalcUsuario[p.partido_id] || {};
           const eq1 = ec.eq1 || (partidosFinalMap[p.partido_id] ? partidosFinalMap[p.partido_id].equipo1 : '?');
           const eq2 = ec.eq2 || (partidosFinalMap[p.partido_id] ? partidosFinalMap[p.partido_id].equipo2 : '?');
-          // Marcador a 90 min
+          // Marcador del partido (incluye prórroga si hubo)
           const g1Pdf = (p.prediccion_equipo1 !== null && p.prediccion_equipo1 !== undefined) ? p.prediccion_equipo1 : '-';
           const g2Pdf = (p.prediccion_equipo2 !== null && p.prediccion_equipo2 !== undefined) ? p.prediccion_equipo2 : '-';
           // Penales (solo si los ingresó, si no '-')
