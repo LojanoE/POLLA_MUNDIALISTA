@@ -22,7 +22,7 @@ Every HTML `<link>`/`<script>` and every local JS `import` appends `?v=N`. Impor
 
 - **`?v=7.5`** baseline (grupos, index, init-db, simular-grupos, reglas, diagnostico, ranking-style-only — but ranking's own script is at 7.9).
 - `final.html` + `js/final.js` → **`?v=7.6`** (edit-after-save flow fix; see §6).
-- `admin.html` + `js/admin.js` → **`?v=7.8`** (PDF predicciones: equipos predichos + columna PENALES; see §11).
+- `admin.html` + `js/admin.js` → **`?v=7.10`** (PDF predicciones: equipos predichos + columna PENALES; see §11. Fix 7.10: ids defensivos para users sin `cedula`/`alias` en el doc).
 - `ranking.html` + `js/ranking.js` → **`?v=7.9`** (Avance del Torneo + Prob% Monte Carlo; see §11).
 - The footer of each `.html` prints the version string; keep it in sync with the `<script>` tags.
 - Only bump the page you're editing — other pages stay at their own version. Don't globally bump unless changing shared code (`data.js`, `auth.js`, `firebase-config.js`).
@@ -140,4 +140,4 @@ When making JS changes to a page, bump that page's `?v=` (and any inline imports
 
 ---
 
-Última actualización: 2026-06-28 (§3 versiones por página; §11 PDF export + MC ranking).
+Última actualización: 2026-06-28 (§3 admin v7.10 fix ids indefensivos; §11 PDF export + MC ranking).

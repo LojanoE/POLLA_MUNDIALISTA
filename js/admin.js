@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.8';
+import { db } from './firebase-config.js?v=7.10';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.8';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.8';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.10';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.10';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -32,6 +32,25 @@ let rondaActualIndex = 0;
 let partidosFinalPorRonda = {};
 let isSaving = false;
 let equiposCalculadosAdmin = {}; // Cache de equipos reales para cada partido según resultados ingresados
+
+// Helper defensivo: algunos documentos de `users` guardados antiguamente
+// no tienen los campos `cedula` / `alias` explicitos. El doc ID sigue el
+// patrón `{cedula}_{alias}`, asi que si faltan los inferimos de ahi para
+// no romper el export PDF ni la busqueda de usuarios.
+function resolverIdUsuario(userId, data) {
+  const safeData = data || {};
+  let cedula = safeData.cedula;
+  let alias = safeData.alias;
+  if ((!cedula || !alias) && typeof userId === 'string' && userId.includes('_')) {
+    const idx = userId.indexOf('_');
+    if (!cedula) cedula = userId.slice(0, idx);
+    if (!alias) alias = userId.slice(idx + 1);
+  }
+  return {
+    cedula: cedula || 'N/D',
+    alias: alias || 'N/D'
+  };
+}
 
 // ===== TOAST NOTIFICATIONS =====
 function showToast(title, message, type = 'info', duration = 5000) {
@@ -1869,7 +1888,10 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
     for (let i = 0; i < usuarios.length; i++) {
       const u = usuarios[i];
       status.textContent = `📄 Generando PDFs... (${i + 1}/${usuarios.length})`;
-      
+
+      // Cedula / alias pueden faltar en documentos antiguos: inferirlos del doc ID
+      const { cedula: uCedula, alias: uAlias } = resolverIdUsuario(u.id, u);
+
       const docPdf = new jsPDF();
       let y = 20;
       
@@ -1890,9 +1912,9 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
       docPdf.text('DATOS DEL PARTICIPANTE:', 20, y);
       y += 7;
       docPdf.setFont(undefined, 'normal');
-      docPdf.text(`Nombre / Alias: ${u.alias}`, 20, y);
+      docPdf.text(`Nombre / Alias: ${uAlias}`, 20, y);
       y += 6;
-      docPdf.text(`Cédula: ${u.cedula}`, 20, y);
+      docPdf.text(`Cédula: ${uCedula}`, 20, y);
       y += 6;
       docPdf.text(`Institución: ${u.institucion_activa || 'No definida'}`, 20, y);
       y += 15;
@@ -1988,7 +2010,7 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
       }
       
       const pdfBlob = docPdf.output('blob');
-      const filename = `${u.cedula}_${u.alias.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      const filename = `${uCedula}_${String(uAlias).replace(/[^a-z0-9]/gi, '_')}.pdf`;
       zip.file(filename, pdfBlob);
     }
     
@@ -2195,12 +2217,25 @@ document.getElementById('btn-search-user').addEventListener('click', async () =>
       const q = query(collection(db, 'users'), where('cedula', '==', cedula));
       const snap = await getDocs(q);
       snap.forEach(d => usuarios.push({ id: d.id, ...d.data() }));
+      // Fallback: docs antiguos sin campo `cedula` no matchearon el where.
+      // Buscarlos por el prefijo del ID del documento ({cedula}_{alias}).
+      if (snap.empty) {
+        const allSnap = await getDocs(collection(db, 'users'));
+        allSnap.forEach(d => {
+          const { cedula: cedId } = resolverIdUsuario(d.id, d.data());
+          if (String(cedId) === cedula) {
+            usuarios.push({ id: d.id, ...d.data() });
+          }
+        });
+      }
     } else if (alias) {
       const q = query(collection(db, 'users'));
       const snap = await getDocs(q);
       snap.forEach(d => {
         const data = d.data();
-        if (data.alias.toLowerCase().includes(alias.toLowerCase())) {
+        // alias puede faltar en docs antiguos; inferirlo del ID para no romper
+        const { alias: aliasUser } = resolverIdUsuario(d.id, data);
+        if (String(aliasUser).toLowerCase().includes(alias.toLowerCase())) {
           usuarios.push({ id: d.id, ...data });
         }
       });
@@ -2227,18 +2262,22 @@ document.getElementById('btn-search-user').addEventListener('click', async () =>
     `;
     
     for (const u of usuarios) {
+      // Inferir cedula/alias del ID si faltan en el documento
+      const { cedula: uCed, alias: uAl } = resolverIdUsuario(u.id, u);
+      const cedSafe = String(uCed).replace(/'/g, "\\'");
+      const alSafe = String(uAl).replace(/'/g, "\\'");
       html += `
         <tr>
-          <td>${u.cedula}</td>
-          <td>${u.alias}</td>
+          <td>${uCed}</td>
+          <td>${uAl}</td>
           <td>${u.puntos_fase_grupos || 0}</td>
           <td>${u.puntos_fase_final || 0}</td>
           <td style="font-weight:bold; color:var(--accent);">${u.puntos_total || 0}</td>
           <td>
             <button class="btn btn-info" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 5px;" 
-              onclick="window.verPrediccionesUsuario('${u.cedula}', '${u.alias}')">📋 Ver</button>
+              onclick="window.verPrediccionesUsuario('${cedSafe}', '${alSafe}')">📋 Ver</button>
             <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;" 
-              onclick="window.eliminarUsuario('${u.cedula}', '${u.alias}')">🗑️ Eliminar</button>
+              onclick="window.eliminarUsuario('${cedSafe}', '${alSafe}')">🗑️ Eliminar</button>
           </td>
         </tr>
       `;
