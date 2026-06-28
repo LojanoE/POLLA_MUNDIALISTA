@@ -20,10 +20,12 @@ Static frontend (no build, no framework) for a World Cup 2026 prediction pool (4
 
 Every HTML `<link>`/`<script>` and every local JS `import` appends `?v=N`. Imports of remote Firebase/CDN URLs do **not** take a version. Bump the version in **all** `?v=` occurrences when making structural changes.
 
-- Current version: **`?v=7.5`** baseline.
-- `final.html` + `js/final.js` are at **`?v=7.6`** (bumped after the final-phase edit-flow fix; see §6).
-- Bump everything together on the next structural change to stay consistent.
+- **`?v=7.5`** baseline (grupos, index, init-db, simular-grupos, reglas, diagnostico, ranking-style-only — but ranking's own script is at 7.9).
+- `final.html` + `js/final.js` → **`?v=7.6`** (edit-after-save flow fix; see §6).
+- `admin.html` + `js/admin.js` → **`?v=7.8`** (PDF predicciones: equipos predichos + columna PENALES; see §11).
+- `ranking.html` + `js/ranking.js` → **`?v=7.9`** (Avance del Torneo + Prob% Monte Carlo; see §11).
 - The footer of each `.html` prints the version string; keep it in sync with the `<script>` tags.
+- Only bump the page you're editing — other pages stay at their own version. Don't globally bump unless changing shared code (`data.js`, `auth.js`, `firebase-config.js`).
 
 ## 4. Architecture that isn't obvious from filenames
 
@@ -32,10 +34,10 @@ Every HTML `<link>`/`<script>` and every local JS `import` appends `?v=N`. Impor
 | `js/firebase-config.js` | Single Firebase init, exports `db`. API key hardcoded (public, open rules). |
 | `js/auth.js` | Custom client-side auth via `localStorage` key `polla_user`. Hardcoded admin: `ADMIN_USER="ADMIN"`, `ADMIN_PASS="Mirador12345"`. Admin session stores `alias:"Administrador"` (not `"ADMIN"`). |
 | `js/data.js` | Source of truth: 48 teams in 12 groups, flag ISO codes, fixture generators, `calcularTablaGrupo`, `seleccionarMejoresTerceros`. |
-| `js/admin.js` | ~2400 lines, biggest file. Owns result entry, phase generation, point recalc, user/institution management, ZIP/PDF export. Find the specific function before editing (`recalcularTodosLosPuntos`, `guardarRondaActual`, `btn-generar-fase-final`, etc.). |
+| `js/admin.js` | ~2500 lines, biggest file. Owns result entry, phase generation, point recalc, user/institution management, ZIP/PDF export. Find the specific function before editing (`recalcularTodosLosPuntos`, `guardarRondaActual`, `btn-generar-fase-final`, `calcularEquiposPredichosUsuario`, etc.). |
 | `js/final.js` | Participant bracket wizard + visual bracket modal. See §6 for the edit-after-save flow. |
 | `js/grupos.js` | Group predictions page. |
-| `js/ranking.js` | Real-time rankings; admin-specific tabs rely on `user.alias === 'ADMIN'` — see §9 inconsistency. |
+| `js/ranking.js` | Real-time rankings + Avance del Torneo + Prob% Monte Carlo on Fase Final (see §11). Admin-specific tabs rely on `user.alias === 'ADMIN'` — see §9 inconsistency. |
 | `init-db.html` | One-shot DB seeder: 72 group matches, 32 final matches (with placeholders), instituion `GDR`, `config/app_config`. Has a known bug (~line 142) referencing undefined `instituciones` in a success message. |
 | `diagnostico.html` | Firebase connection test. **Duplicates Firebase config inline** — keep in sync with `js/firebase-config.js` on any migration. |
 | `simular-grupos.html` | Creates 5 fake users (`SIM001`–`SIM005`) with random group predictions. |
@@ -112,6 +114,30 @@ If you change scoring, update `reglas.html`, `admin.js`, and this file together 
 
 When making JS changes to a page, bump that page's `?v=` (and any inline imports it owns) rather than asking users to hard-refresh.
 
+## 11. PDF export + Ranking Monte Carlo (recently added)
+
+### PDF de Predicciones (`admin.js` "Exportar todo a PDF" → ZIP)
+- The PDF Fase Final table can't read team names from `partidos_final.equipo1/2` for F17+ (those are placeholders like `"Ganador F1"`). Instead, `calcularEquiposPredichosUsuario(prediccionesArr, partidosFinalArr)` (admin.js ~line 1723) **recursively resolves each participant's predicted teams** from their own `predicciones_final` docs — same algorithm as `final.js:recalcularTodosEquipos` but read-only.
+- **Gotcha:** when building `partidosFinalMap` for the PDF (admin.js ~line 1862), each entry **must** include the doc `id`: `partidosFinalMap[d.id] = { id: d.id, ...d.data() }`. The `id` is what the resolver indexes by; omitting it silently breaks F17+ resolution back to placeholders.
+- PDF Fase Final table has 4 columns: `RONDA / PARTIDO | MARCADOR | PENALES | GANADOR`. Penales column shows `"-"` if the user didn't input penalty scores.
+- This is **display-only** — it never writes to Firestore or affects scoring. The real `recalcularTodosLosPuntos` (admin.js:402) is untouched.
+
+### Ranking Prob% (`ranking.html` + `js/ranking.js` at `?v=7.9`)
+- New `<div id="avance-torneo">` above the rankings: `(jugados_grupos + jugados_final) / 104 × 100`, with a progress bar. Refreshes via `onSnapshot` on both `partidos_grupos` and `partidos_final`.
+- New `Prob%` column in the **Fase Final** table only (not grupos). Computed by `calcularProbabilidadesMC()` — a Monte Carlo over 1000 iterations:
+  - **Baseline fixed** = `user.puntos_fase_final || 0` (Fase Final only; **does not mix grupos** — confirmed split).
+  - Each iteration: for each `partidos_final` with `jugado !== true`, sample goles 0-3 (independent) and penales 0-5 if tied. Resolves F17+ teams via `resolverEquipoRealMC`+`getGanadorRealMC`+`scorePartidoFinalMC` — **exact replicas of admin.js:491-587** operating on the sampled state.
+  - User's simulated pts = `baseline + Σ_{no jugados} scorePartidoFinalMC(sampledMatch, predUser)`.
+  - Whoever is max → +1 to `contadorGanador[uid]`. Ties broken uniform-random.
+  - `prob[uid] = contadorGanador[uid] / 1000 × 100`. Sum across users ≈ 100%.
+- **Execution chunked** (50 iter/frame via `setTimeout(0)`) so the spinner in the Prob% cell doesn't freeze the UI. Takes ~1-3s.
+- **Real-time refresh**: `onSnapshot(collection(db,'partidos_final'))` marks `mcDirty` and re-runs MC automatically when the admin saves any result. Also a manual "🔄 Recalcular probabilidades" button.
+- **Edge case — all 32 final matches already played** → MC short-circuits: 100% to the #1 (split evenly on puntos ties), 0% to the rest.
+- **Edge case — user has no `predicciones_final` for a not-played match** → contributes 0 pts for that match in every iteration.
+- Prob% cell color-codes: green ≥50%, accent ≥20%, yellow ≥5%, orange >0%, grey =0%.
+- MC scoring was validated against admin.js scoring with a Node script (10 synthetic users × 100 iter): leader comfortable → ~100%, equal baselines + opposing preds → ~50/50, stragger → 0%, tournament complete → 100% to #1.
+- **Don't** mix `puntos_fase_grupos` into the MC baseline — the user explicitly wants the two phases tracked separately.
+
 ---
 
-Última actualización: 2026-06-28.
+Última actualización: 2026-06-28 (§3 versiones por página; §11 PDF export + MC ranking).
