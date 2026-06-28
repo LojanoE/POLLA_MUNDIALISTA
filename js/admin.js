@@ -2369,27 +2369,27 @@ function renderMatchBracketAdmin(partidoId, equipos) {
   const eq1 = equipos[partidoId]?.eq1 || '?';
   const eq2 = equipos[partidoId]?.eq2 || '?';
   const nextId = BRACKET_NEXT_MATCH[partidoId];
-  const arrow = nextId ? `<span class="bracket-arrow">→ <span>${nextId}</span></span>` : '';
+  const arrow = nextId ? `<div class="bracket-arrow-vertical">→ ${nextId}</div>` : '';
   return `
-    <div class="bracket-match">
-      <span class="bracket-match-id">${partidoId}</span>
+    <div class="bracket-match-vertical" data-id="${partidoId}">
+      <div class="bracket-match-header">
+        <span class="bracket-match-id">${partidoId}</span>
+      </div>
       ${renderEquipoBracketAdmin(eq1)}
-      <span class="bracket-vs">VS</span>
+      <div class="bracket-vs">VS</div>
       ${renderEquipoBracketAdmin(eq2)}
       ${arrow}
     </div>
   `;
 }
 
-function renderRondaBracketAdmin(titulo, idsMatch, equipos) {
-  const matchesHtml = idsMatch.map(id => renderMatchBracketAdmin(id, equipos)).join('');
-  return `
-    <div class="bracket-round">
-      <div class="bracket-round-title">${titulo}</div>
-      ${matchesHtml}
-    </div>
-  `;
-}
+const COLUMNAS_BRACKET = [
+  { titulo: 'Dieciseisavos de Final', ids: ['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12','F13','F14','F15','F16'] },
+  { titulo: 'Octavos de Final', ids: ['F17','F18','F19','F20','F21','F22','F23','F24'] },
+  { titulo: 'Cuartos de Final', ids: ['F25','F26','F27','F28'] },
+  { titulo: 'Semifinales', ids: ['F29','F30'] },
+  { titulo: 'Finales', ids: ['F32','F31'] }
+];
 
 function renderizarBracketAdmin() {
   const container = document.getElementById('modal-bracket-body');
@@ -2397,42 +2397,16 @@ function renderizarBracketAdmin() {
   
   const equipos = calcularTodosEquiposBracket();
   
-  const leftDieciseisavos = BRACKET_LEFT.filter(id => parseInt(id.substring(1)) <= 16);
-  const leftOctavos = BRACKET_LEFT.filter(id => { const n = parseInt(id.substring(1)); return n >= 17 && n <= 20; });
-  const leftCuartos = BRACKET_LEFT.filter(id => { const n = parseInt(id.substring(1)); return n >= 25 && n <= 26; });
-  const leftSemis = BRACKET_LEFT.filter(id => id === 'F29');
-  
-  const rightDieciseisavos = BRACKET_RIGHT.filter(id => parseInt(id.substring(1)) <= 16);
-  const rightOctavos = BRACKET_RIGHT.filter(id => { const n = parseInt(id.substring(1)); return n >= 21 && n <= 24; });
-  const rightCuartos = BRACKET_RIGHT.filter(id => { const n = parseInt(id.substring(1)); return n >= 27 && n <= 28; });
-  const rightSemis = BRACKET_RIGHT.filter(id => id === 'F30');
-  
   const html = `
-    <div class="bracket-container">
-      <div class="bracket-half">
-        <div class="bracket-half-title">🔼 Mitad Superior</div>
-        ${renderRondaBracketAdmin('Dieciseisavos de Final', leftDieciseisavos, equipos)}
-        ${renderRondaBracketAdmin('Octavos de Final', leftOctavos, equipos)}
-        ${renderRondaBracketAdmin('Cuartos de Final', leftCuartos, equipos)}
-        ${renderRondaBracketAdmin('Semifinal', leftSemis, equipos)}
-      </div>
-      <div class="bracket-half">
-        <div class="bracket-half-title">🔽 Mitad Inferior</div>
-        ${renderRondaBracketAdmin('Dieciseisavos de Final', rightDieciseisavos, equipos)}
-        ${renderRondaBracketAdmin('Octavos de Final', rightOctavos, equipos)}
-        ${renderRondaBracketAdmin('Cuartos de Final', rightCuartos, equipos)}
-        ${renderRondaBracketAdmin('Semifinal', rightSemis, equipos)}
-      </div>
-      <div class="bracket-final-section">
-        <div class="bracket-final-box">
-          <div class="bracket-round-title">🏆 La Gran Final</div>
-          ${renderMatchBracketAdmin('F32', equipos)}
+    <div class="bracket-tree">
+      ${COLUMNAS_BRACKET.map(col => `
+        <div class="bracket-column">
+          <div class="bracket-column-title">${col.titulo}</div>
+          <div class="bracket-column-matches">
+            ${col.ids.map(id => renderMatchBracketAdmin(id, equipos)).join('')}
+          </div>
         </div>
-        <div class="bracket-final-box" style="border-color: #cd7f32;">
-          <div class="bracket-round-title" style="color: #cd7f32;">🥉 Tercer Lugar</div>
-          ${renderMatchBracketAdmin('F31', equipos)}
-        </div>
-      </div>
+      `).join('')}
     </div>
   `;
   
