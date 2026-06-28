@@ -44,6 +44,7 @@ let rondaActualIndex = 0;
 let partidosPorRonda = {};
 let isSaving = false;
 let prediccionesFinalAbiertas = true;
+let mapaDependencias = {};       // { sourceId: [partidoId que depende de sourceId, ...] }
 
 // ===== UTILIDADES =====
 function showAlert(msg, type) {
@@ -114,6 +115,9 @@ async function cargarPartidosFinal() {
     snapshot.forEach(d => partidosFinal.push({ id: d.id, ...d.data() }));
     partidosFinal.sort((a, b) => a.numero - b.numero);
     
+    // Construir mapa de dependencias (ganador + perdedor) para propagar ediciones
+    construirMapaDependencias();
+    
     // Organizar por ronda
     partidosPorRonda = {};
     for (const r of RONDAS) partidosPorRonda[r] = [];
@@ -170,6 +174,45 @@ async function cargarPrediccionesUsuario() {
   } catch (err) {
     console.error('Error cargando predicciones:', err);
   }
+}
+
+// ===== MAPA DE DEPENDENCIAS (inverso de source_equipo) =====
+// Construye mapaDependencias a partir de los campos source_equipo1/2 de cada partido.
+// Incluye tanto dependencias por ganador como por perdedor (ej. tercer lugar).
+function construirMapaDependencias() {
+  mapaDependencias = {};
+  for (const p of partidosFinal) {
+    const sources = [
+      p.source_equipo1 || extraerSourceDePlaceholder(p.equipo1),
+      p.source_equipo2 || extraerSourceDePlaceholder(p.equipo2)
+    ];
+    for (const src of sources) {
+      if (!src) continue;
+      if (!mapaDependencias[src]) mapaDependencias[src] = [];
+      if (!mapaDependencias[src].includes(p.id)) {
+        mapaDependencias[src].push(p.id);
+      }
+    }
+  }
+}
+
+// Devuelve todos los partidos que dependen transitivamente de `partidoId`
+// (ej. F1 -> F17 -> F25 -> F29 -> F32 y F29 -> F31 via perdedor)
+function obtenerDependientesTransitivos(partidoId) {
+  const result = new Set();
+  const stack = [partidoId];
+  while (stack.length) {
+    const cur = stack.pop();
+    const deps = mapaDependencias[cur];
+    if (!deps) continue;
+    for (const depId of deps) {
+      if (!result.has(depId)) {
+        result.add(depId);
+        stack.push(depId);
+      }
+    }
+  }
+  return result;
 }
 
 // ===== CÁLCULO DE EQUIPOS =====
@@ -407,16 +450,36 @@ function handleInputChange(e) {
     prediccionesGuardadasIds.delete(id);
   }
   
-  // Actualizar penales y ganador visualmente
-  actualizarCardVisual(id);
+  // Propagar el "sucia" a TODOS los partidos dependientes (F17, F25, F29, F31, F32...)
+  // asi el bracket se recalcula completo y el usuario debe volver a guardar el batch.
+  // Incluye dependencias por ganador y por perdedor (tercer lugar F31).
+  const dependientes = obtenerDependientesTransitivos(id);
+  for (const depId of dependientes) {
+    if (prediccionesGuardadasIds.has(depId)) {
+      prediccionesGuardadasIds.delete(depId);
+    }
+    if (prediccionesLocales[depId]) {
+      prediccionesLocales[depId].ganador = '';
+    }
+  }
   
-  // SIEMPRE recalcular equipos de rondas posteriores cuando cambia cualquier partido
+  // SIEMPRE recalcular equipos de rondas posteriores cuando cambia cualquier partido.
+  // Se hace ANTES de actualizarCardVisual para que los badges usen equiposCalculados fresco.
   const partido = partidosFinal.find(p => p.id === id);
   if (partido) {
-    // Recalcular TODOS los equipos (la cadena de dependencias puede ser larga)
     recalcularTodosEquipos();
-    
-    // Si estamos viendo una ronda posterior a la editada, re-renderizar para mostrar nuevos equipos
+  }
+  
+  // Actualizar penales y ganador visualmente (usa equiposCalculados ya recalculado)
+  actualizarCardVisual(id);
+  for (const depId of dependientes) {
+    actualizarCardVisual(depId);
+  }
+  
+  if (partido) {
+    // Si estamos viendo una ronda posterior a la editada, re-renderizar para mostrar
+    // los nuevos equipos/ganadores de las tarjetas dependientes visibles.
+    // (Si editamos la ronda actual NO re-renderizamos para no perder el foco del input.)
     const rondaEditadaIdx = RONDAS.indexOf(partido.ronda);
     if (rondaEditadaIdx < rondaActualIndex) {
       renderizarRondaActual();
@@ -440,6 +503,11 @@ function actualizarCardVisual(partidoId) {
   
   const pred = prediccionesLocales[partidoId];
   if (!pred) return;
+  
+  // Si el partido fue editado (ya no esta en guardados), quitar el estilo "saved"
+  if (!prediccionesGuardadasIds.has(partidoId)) {
+    card.classList.remove('saved');
+  }
   
   const g1 = pred.g1 !== '' ? parseInt(pred.g1) : null;
   const g2 = pred.g2 !== '' ? parseInt(pred.g2) : null;
@@ -528,6 +596,10 @@ function actualizarBotonesGuardado() {
   const btnProgress = document.getElementById('btn-save-progress');
   const status = document.getElementById('save-status');
   
+  // Resetear estado disabled heredado de un guardado previo
+  btnProgress.disabled = false;
+  btnFinal.disabled = false;
+  
   // Contar completados
   let completados = 0;
   let guardados = 0;
@@ -569,8 +641,8 @@ function actualizarBotonesGuardado() {
   } else if (todoGuardado) {
     btnFinal.disabled = true;
     btnFinal.textContent = '✅ Todo Guardado';
-    btnProgress.style.display = 'none';
-    status.textContent = 'Todas tus predicciones están guardadas. ¡Suerte!';
+    btnProgress.style.display = 'inline-block';
+    status.textContent = 'Todas tus predicciones están guardadas. Puedes editarlas mientras la fase esté abierta.';
   } else if (todoCompleto) {
     btnFinal.disabled = false;
     btnFinal.textContent = '✅ Finalizar y Guardar Todo';
@@ -654,10 +726,10 @@ document.getElementById('btn-save-final').addEventListener('click', async () => 
   
   // Confirmación
   const confirmar = confirm(
-    `🏆 ¿ESTÁS SEGURO DE GUARDAR DEFINITIVAMENTE?\n\n` +
-    `Estás a punto de guardar TODAS tus predicciones de la fase final.\n` +
+    `🏆 ¿GUARDAR TODAS LAS PREDICCIONES DE LA FASE FINAL?\n\n` +
     `Total: ${partidosFinal.length} partidos\n\n` +
-    `⚠️ Una vez guardadas, NO podrás editarlas nunca más.\n\n` +
+    `Esto guardará todas tus predicciones completas.\n` +
+    `Mientras la fase final siga abierta podrás seguir editando y volver a guardar.\n\n` +
     `¿Deseas continuar?`
   );
   
@@ -752,8 +824,8 @@ async function guardarPredicciones(bloquear = false) {
     await batch.commit();
     
     if (bloquear) {
-      showAlert(`¡${count} predicciones guardadas definitivamente!`, 'success');
-      status.textContent = '✅ Predicciones guardadas. No se pueden editar.';
+      showAlert(`¡${count} predicciones guardadas!`, 'success');
+      status.textContent = `✓ ${count} predicciones guardadas. Puedes seguir editando mientras la fase esté abierta.`;
     } else {
       showAlert(`¡${count} predicciones guardadas!`, 'success');
       status.textContent = `✓ Progreso guardado (${count} partidos). Puedes seguir editando.`;
