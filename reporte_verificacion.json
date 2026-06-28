@@ -1,0 +1,1520 @@
+{
+  "coinciden": [
+    {
+      "firestore": {
+        "id": "G1",
+        "grupo": "A",
+        "equipo1": "México",
+        "equipo2": "Sudáfrica",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "1",
+        "grupo": "A",
+        "equipo1": "México",
+        "equipo2": "Sudáfrica",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G12",
+        "grupo": "B",
+        "equipo1": "Bosnia y Herzegovina",
+        "equipo2": "Catar",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "53",
+        "grupo": "B",
+        "equipo1": "Bosnia y Herzegovina",
+        "equipo2": "Catar",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G13",
+        "grupo": "C",
+        "equipo1": "Brasil",
+        "equipo2": "Marruecos",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "7",
+        "grupo": "C",
+        "equipo1": "Brasil",
+        "equipo2": "Marruecos",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G14",
+        "grupo": "C",
+        "equipo1": "Haití",
+        "equipo2": "Escocia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "5",
+        "grupo": "C",
+        "equipo1": "Haití",
+        "equipo2": "Escocia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G15",
+        "grupo": "C",
+        "equipo1": "Brasil",
+        "equipo2": "Haití",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "29",
+        "grupo": "C",
+        "equipo1": "Brasil",
+        "equipo2": "Haití",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G18",
+        "grupo": "C",
+        "equipo1": "Marruecos",
+        "equipo2": "Haití",
+        "goles_equipo1": 4,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "50",
+        "grupo": "C",
+        "equipo1": "Marruecos",
+        "equipo2": "Haití",
+        "goles_equipo1": 4,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G19",
+        "grupo": "D",
+        "equipo1": "Estados Unidos",
+        "equipo2": "Paraguay",
+        "goles_equipo1": 4,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "4",
+        "grupo": "D",
+        "equipo1": "Estados Unidos",
+        "equipo2": "Paraguay",
+        "goles_equipo1": 4,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G2",
+        "grupo": "A",
+        "equipo1": "Corea del Sur",
+        "equipo2": "República Checa",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "2",
+        "grupo": "A",
+        "equipo1": "Corea del Sur",
+        "equipo2": "República Checa",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G20",
+        "grupo": "D",
+        "equipo1": "Australia",
+        "equipo2": "Turquía",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "6",
+        "grupo": "D",
+        "equipo1": "Australia",
+        "equipo2": "Turquía",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G21",
+        "grupo": "D",
+        "equipo1": "Estados Unidos",
+        "equipo2": "Australia",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "31",
+        "grupo": "D",
+        "equipo1": "Estados Unidos",
+        "equipo2": "Australia",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G24",
+        "grupo": "D",
+        "equipo1": "Paraguay",
+        "equipo2": "Australia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "57",
+        "grupo": "D",
+        "equipo1": "Paraguay",
+        "equipo2": "Australia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G25",
+        "grupo": "E",
+        "equipo1": "Alemania",
+        "equipo2": "Curazao",
+        "goles_equipo1": 7,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "10",
+        "grupo": "E",
+        "equipo1": "Alemania",
+        "equipo2": "Curazao",
+        "goles_equipo1": 7,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G26",
+        "grupo": "E",
+        "equipo1": "Costa de Marfil",
+        "equipo2": "Ecuador",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "9",
+        "grupo": "E",
+        "equipo1": "Costa de Marfil",
+        "equipo2": "Ecuador",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G27",
+        "grupo": "E",
+        "equipo1": "Alemania",
+        "equipo2": "Costa de Marfil",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "33",
+        "grupo": "E",
+        "equipo1": "Alemania",
+        "equipo2": "Costa de Marfil",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G28",
+        "grupo": "E",
+        "equipo1": "Curazao",
+        "equipo2": "Ecuador",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "34",
+        "grupo": "E",
+        "equipo1": "Ecuador",
+        "equipo2": "Curazao",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G3",
+        "grupo": "A",
+        "equipo1": "México",
+        "equipo2": "Corea del Sur",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "25",
+        "grupo": "A",
+        "equipo1": "México",
+        "equipo2": "Corea del Sur",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G30",
+        "grupo": "E",
+        "equipo1": "Curazao",
+        "equipo2": "Costa de Marfil",
+        "goles_equipo1": 0,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "55",
+        "grupo": "E",
+        "equipo1": "Curazao",
+        "equipo2": "Costa de Marfil",
+        "goles_equipo1": 0,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G31",
+        "grupo": "F",
+        "equipo1": "Países Bajos",
+        "equipo2": "Japón",
+        "goles_equipo1": 2,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "11",
+        "grupo": "F",
+        "equipo1": "Países Bajos",
+        "equipo2": "Japón",
+        "goles_equipo1": 2,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G32",
+        "grupo": "F",
+        "equipo1": "Suecia",
+        "equipo2": "Túnez",
+        "goles_equipo1": 5,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "12",
+        "grupo": "F",
+        "equipo1": "Suecia",
+        "equipo2": "Túnez",
+        "goles_equipo1": 5,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G33",
+        "grupo": "F",
+        "equipo1": "Países Bajos",
+        "equipo2": "Suecia",
+        "goles_equipo1": 5,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "35",
+        "grupo": "F",
+        "equipo1": "Países Bajos",
+        "equipo2": "Suecia",
+        "goles_equipo1": 5,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G36",
+        "grupo": "F",
+        "equipo1": "Japón",
+        "equipo2": "Suecia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "59",
+        "grupo": "F",
+        "equipo1": "Japón",
+        "equipo2": "Suecia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G37",
+        "grupo": "G",
+        "equipo1": "Bélgica",
+        "equipo2": "Egipto",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "15",
+        "grupo": "G",
+        "equipo1": "Bélgica",
+        "equipo2": "Egipto",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G38",
+        "grupo": "G",
+        "equipo1": "Irán",
+        "equipo2": "Nueva Zelanda",
+        "goles_equipo1": 2,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "13",
+        "grupo": "G",
+        "equipo1": "Irán",
+        "equipo2": "Nueva Zelanda",
+        "goles_equipo1": 2,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G39",
+        "grupo": "G",
+        "equipo1": "Bélgica",
+        "equipo2": "Irán",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "37",
+        "grupo": "G",
+        "equipo1": "Bélgica",
+        "equipo2": "Irán",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G4",
+        "grupo": "A",
+        "equipo1": "Sudáfrica",
+        "equipo2": "República Checa",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "28",
+        "grupo": "A",
+        "equipo1": "República Checa",
+        "equipo2": "Sudáfrica",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G42",
+        "grupo": "G",
+        "equipo1": "Egipto",
+        "equipo2": "Irán",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "63",
+        "grupo": "G",
+        "equipo1": "Egipto",
+        "equipo2": "Irán",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G43",
+        "grupo": "H",
+        "equipo1": "España",
+        "equipo2": "Cabo Verde",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "14",
+        "grupo": "H",
+        "equipo1": "España",
+        "equipo2": "Cabo Verde",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G44",
+        "grupo": "H",
+        "equipo1": "Arabia Saudí",
+        "equipo2": "Uruguay",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "16",
+        "grupo": "H",
+        "equipo1": "Arabia Saudí",
+        "equipo2": "Uruguay",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G45",
+        "grupo": "H",
+        "equipo1": "España",
+        "equipo2": "Arabia Saudí",
+        "goles_equipo1": 4,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "39",
+        "grupo": "H",
+        "equipo1": "España",
+        "equipo2": "Arabia Saudí",
+        "goles_equipo1": 4,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G46",
+        "grupo": "H",
+        "equipo1": "Cabo Verde",
+        "equipo2": "Uruguay",
+        "goles_equipo1": 2,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "40",
+        "grupo": "H",
+        "equipo1": "Uruguay",
+        "equipo2": "Cabo Verde",
+        "goles_equipo1": 2,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G48",
+        "grupo": "H",
+        "equipo1": "Cabo Verde",
+        "equipo2": "Arabia Saudí",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "65",
+        "grupo": "H",
+        "equipo1": "Cabo Verde",
+        "equipo2": "Arabia Saudí",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G49",
+        "grupo": "I",
+        "equipo1": "Francia",
+        "equipo2": "Senegal",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "17",
+        "grupo": "I",
+        "equipo1": "Francia",
+        "equipo2": "Senegal",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G50",
+        "grupo": "I",
+        "equipo1": "Irak",
+        "equipo2": "Noruega",
+        "goles_equipo1": 1,
+        "goles_equipo2": 4,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "18",
+        "grupo": "I",
+        "equipo1": "Irak",
+        "equipo2": "Noruega",
+        "goles_equipo1": 1,
+        "goles_equipo2": 4,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G51",
+        "grupo": "I",
+        "equipo1": "Francia",
+        "equipo2": "Irak",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "41",
+        "grupo": "I",
+        "equipo1": "Francia",
+        "equipo2": "Irak",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G54",
+        "grupo": "I",
+        "equipo1": "Senegal",
+        "equipo2": "Irak",
+        "goles_equipo1": 5,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "61",
+        "grupo": "I",
+        "equipo1": "Senegal",
+        "equipo2": "Irak",
+        "goles_equipo1": 5,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G55",
+        "grupo": "J",
+        "equipo1": "Argentina",
+        "equipo2": "Argelia",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "19",
+        "grupo": "J",
+        "equipo1": "Argentina",
+        "equipo2": "Argelia",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G56",
+        "grupo": "J",
+        "equipo1": "Austria",
+        "equipo2": "Jordania",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "20",
+        "grupo": "J",
+        "equipo1": "Austria",
+        "equipo2": "Jordania",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G57",
+        "grupo": "J",
+        "equipo1": "Argentina",
+        "equipo2": "Austria",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "43",
+        "grupo": "J",
+        "equipo1": "Argentina",
+        "equipo2": "Austria",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G6",
+        "grupo": "A",
+        "equipo1": "Sudáfrica",
+        "equipo2": "Corea del Sur",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "51",
+        "grupo": "A",
+        "equipo1": "Sudáfrica",
+        "equipo2": "Corea del Sur",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G60",
+        "grupo": "J",
+        "equipo1": "Argelia",
+        "equipo2": "Austria",
+        "goles_equipo1": 3,
+        "goles_equipo2": 3,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "69",
+        "grupo": "J",
+        "equipo1": "Argelia",
+        "equipo2": "Austria",
+        "goles_equipo1": 3,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G61",
+        "grupo": "K",
+        "equipo1": "Portugal",
+        "equipo2": "RD Congo",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "21",
+        "grupo": "K",
+        "equipo1": "Portugal",
+        "equipo2": "RD Congo",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G62",
+        "grupo": "K",
+        "equipo1": "Uzbekistán",
+        "equipo2": "Colombia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 3,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "23",
+        "grupo": "K",
+        "equipo1": "Uzbekistán",
+        "equipo2": "Colombia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G63",
+        "grupo": "K",
+        "equipo1": "Portugal",
+        "equipo2": "Uzbekistán",
+        "goles_equipo1": 5,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "45",
+        "grupo": "K",
+        "equipo1": "Portugal",
+        "equipo2": "Uzbekistán",
+        "goles_equipo1": 5,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G65",
+        "grupo": "K",
+        "equipo1": "Portugal",
+        "equipo2": "Colombia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "71",
+        "grupo": "K",
+        "equipo1": "Colombia",
+        "equipo2": "Portugal",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G66",
+        "grupo": "K",
+        "equipo1": "RD Congo",
+        "equipo2": "Uzbekistán",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "72",
+        "grupo": "K",
+        "equipo1": "RD Congo",
+        "equipo2": "Uzbekistán",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G67",
+        "grupo": "L",
+        "equipo1": "Inglaterra",
+        "equipo2": "Croacia",
+        "goles_equipo1": 4,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "22",
+        "grupo": "L",
+        "equipo1": "Inglaterra",
+        "equipo2": "Croacia",
+        "goles_equipo1": 4,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G68",
+        "grupo": "L",
+        "equipo1": "Ghana",
+        "equipo2": "Panamá",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "24",
+        "grupo": "L",
+        "equipo1": "Ghana",
+        "equipo2": "Panamá",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G69",
+        "grupo": "L",
+        "equipo1": "Inglaterra",
+        "equipo2": "Ghana",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "48",
+        "grupo": "L",
+        "equipo1": "Inglaterra",
+        "equipo2": "Ghana",
+        "goles_equipo1": 0,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G7",
+        "grupo": "B",
+        "equipo1": "Canadá",
+        "equipo2": "Bosnia y Herzegovina",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "3",
+        "grupo": "B",
+        "equipo1": "Canadá",
+        "equipo2": "Bosnia y Herzegovina",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G72",
+        "grupo": "L",
+        "equipo1": "Croacia",
+        "equipo2": "Ghana",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "68",
+        "grupo": "L",
+        "equipo1": "Croacia",
+        "equipo2": "Ghana",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G8",
+        "grupo": "B",
+        "equipo1": "Catar",
+        "equipo2": "Suiza",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 1
+      },
+      "oficial": {
+        "id": "8",
+        "grupo": "B",
+        "equipo1": "Catar",
+        "equipo2": "Suiza",
+        "goles_equipo1": 1,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G9",
+        "grupo": "B",
+        "equipo1": "Canadá",
+        "equipo2": "Catar",
+        "goles_equipo1": 6,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "27",
+        "grupo": "B",
+        "equipo1": "Canadá",
+        "equipo2": "Catar",
+        "goles_equipo1": 6,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    }
+  ],
+  "discrepancias": [
+    {
+      "firestore": {
+        "id": "G10",
+        "grupo": "B",
+        "equipo1": "Bosnia y Herzegovina",
+        "equipo2": "Suiza",
+        "goles_equipo1": 1,
+        "goles_equipo2": 4,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "26",
+        "grupo": "B",
+        "equipo1": "Suiza",
+        "equipo2": "Bosnia y Herzegovina",
+        "goles_equipo1": 4,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G11",
+        "grupo": "B",
+        "equipo1": "Canadá",
+        "equipo2": "Suiza",
+        "goles_equipo1": 1,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "54",
+        "grupo": "B",
+        "equipo1": "Suiza",
+        "equipo2": "Canadá",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G16",
+        "grupo": "C",
+        "equipo1": "Marruecos",
+        "equipo2": "Escocia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "30",
+        "grupo": "C",
+        "equipo1": "Escocia",
+        "equipo2": "Marruecos",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G17",
+        "grupo": "C",
+        "equipo1": "Brasil",
+        "equipo2": "Escocia",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "49",
+        "grupo": "C",
+        "equipo1": "Escocia",
+        "equipo2": "Brasil",
+        "goles_equipo1": 0,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G22",
+        "grupo": "D",
+        "equipo1": "Paraguay",
+        "equipo2": "Turquía",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "32",
+        "grupo": "D",
+        "equipo1": "Turquía",
+        "equipo2": "Paraguay",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G23",
+        "grupo": "D",
+        "equipo1": "Estados Unidos",
+        "equipo2": "Turquía",
+        "goles_equipo1": 2,
+        "goles_equipo2": 3,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "58",
+        "grupo": "D",
+        "equipo1": "Turquía",
+        "equipo2": "Estados Unidos",
+        "goles_equipo1": 3,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G29",
+        "grupo": "E",
+        "equipo1": "Alemania",
+        "equipo2": "Ecuador",
+        "goles_equipo1": 1,
+        "goles_equipo2": 2,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "56",
+        "grupo": "E",
+        "equipo1": "Ecuador",
+        "equipo2": "Alemania",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G34",
+        "grupo": "F",
+        "equipo1": "Japón",
+        "equipo2": "Túnez",
+        "goles_equipo1": 4,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "36",
+        "grupo": "F",
+        "equipo1": "Túnez",
+        "equipo2": "Japón",
+        "goles_equipo1": 0,
+        "goles_equipo2": 4,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G35",
+        "grupo": "F",
+        "equipo1": "Países Bajos",
+        "equipo2": "Túnez",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "60",
+        "grupo": "F",
+        "equipo1": "Túnez",
+        "equipo2": "Países Bajos",
+        "goles_equipo1": 1,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G40",
+        "grupo": "G",
+        "equipo1": "Egipto",
+        "equipo2": "Nueva Zelanda",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "38",
+        "grupo": "G",
+        "equipo1": "Nueva Zelanda",
+        "equipo2": "Egipto",
+        "goles_equipo1": 1,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G41",
+        "grupo": "G",
+        "equipo1": "Bélgica",
+        "equipo2": "Nueva Zelanda",
+        "goles_equipo1": 5,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "64",
+        "grupo": "G",
+        "equipo1": "Nueva Zelanda",
+        "equipo2": "Bélgica",
+        "goles_equipo1": 1,
+        "goles_equipo2": 5,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G47",
+        "grupo": "H",
+        "equipo1": "España",
+        "equipo2": "Uruguay",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "66",
+        "grupo": "H",
+        "equipo1": "Uruguay",
+        "equipo2": "España",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G5",
+        "grupo": "A",
+        "equipo1": "México",
+        "equipo2": "República Checa",
+        "goles_equipo1": 3,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "52",
+        "grupo": "A",
+        "equipo1": "República Checa",
+        "equipo2": "México",
+        "goles_equipo1": 0,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G52",
+        "grupo": "I",
+        "equipo1": "Senegal",
+        "equipo2": "Noruega",
+        "goles_equipo1": 2,
+        "goles_equipo2": 3,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "42",
+        "grupo": "I",
+        "equipo1": "Noruega",
+        "equipo2": "Senegal",
+        "goles_equipo1": 3,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G53",
+        "grupo": "I",
+        "equipo1": "Francia",
+        "equipo2": "Noruega",
+        "goles_equipo1": 4,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "62",
+        "grupo": "I",
+        "equipo1": "Noruega",
+        "equipo2": "Francia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 4,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G58",
+        "grupo": "J",
+        "equipo1": "Argelia",
+        "equipo2": "Jordania",
+        "goles_equipo1": 2,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "44",
+        "grupo": "J",
+        "equipo1": "Jordania",
+        "equipo2": "Argelia",
+        "goles_equipo1": 1,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G59",
+        "grupo": "J",
+        "equipo1": "Argentina",
+        "equipo2": "Jordania",
+        "goles_equipo1": 3,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "70",
+        "grupo": "J",
+        "equipo1": "Jordania",
+        "equipo2": "Argentina",
+        "goles_equipo1": 1,
+        "goles_equipo2": 3,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G64",
+        "grupo": "K",
+        "equipo1": "RD Congo",
+        "equipo2": "Colombia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "47",
+        "grupo": "K",
+        "equipo1": "Colombia",
+        "equipo2": "RD Congo",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G70",
+        "grupo": "L",
+        "equipo1": "Croacia",
+        "equipo2": "Panamá",
+        "goles_equipo1": 1,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 2
+      },
+      "oficial": {
+        "id": "46",
+        "grupo": "L",
+        "equipo1": "Panamá",
+        "equipo2": "Croacia",
+        "goles_equipo1": 0,
+        "goles_equipo2": 1,
+        "jugado": true
+      }
+    },
+    {
+      "firestore": {
+        "id": "G71",
+        "grupo": "L",
+        "equipo1": "Inglaterra",
+        "equipo2": "Panamá",
+        "goles_equipo1": 2,
+        "goles_equipo2": 0,
+        "jugado": true,
+        "fecha": 3
+      },
+      "oficial": {
+        "id": "67",
+        "grupo": "L",
+        "equipo1": "Panamá",
+        "equipo2": "Inglaterra",
+        "goles_equipo1": 0,
+        "goles_equipo2": 2,
+        "jugado": true
+      }
+    }
+  ],
+  "no_encontrados_en_firestore": [],
+  "solo_en_firestore": []
+}

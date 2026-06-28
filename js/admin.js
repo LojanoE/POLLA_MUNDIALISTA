@@ -750,6 +750,182 @@ function calcularEquipoDinamico(partidoId, esEquipo1, visited = new Set()) {
   return ganador;
 }
 
+// ===== EXPORTAR RESULTADOS A EXCEL =====
+function escaparHtmlExcel(texto) {
+  return String(texto ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function calcularGanadorExport(g1, g2, p1, p2, eq1, eq2) {
+  const n1 = g1 === '' || g1 === null || g1 === undefined ? null : parseInt(g1);
+  const n2 = g2 === '' || g2 === null || g2 === undefined ? null : parseInt(g2);
+  if (n1 === null || n2 === null) return '';
+  if (n1 > n2) return eq1 || '';
+  if (n2 > n1) return eq2 || '';
+
+  const pen1 = p1 === '' || p1 === null || p1 === undefined ? null : parseInt(p1);
+  const pen2 = p2 === '' || p2 === null || p2 === undefined ? null : parseInt(p2);
+  if (pen1 !== null && pen2 !== null && pen1 !== pen2) {
+    return pen1 > pen2 ? (eq1 || '') : (eq2 || '');
+  }
+  return 'Empate (sin definir por penales)';
+}
+
+async function exportarResultadosExcel() {
+  try {
+    // Asegurar que los datos estén cargados
+    if (!partidosGruposData || Object.keys(partidosGruposData).length === 0) {
+      await cargarPartidosGrupos();
+    }
+    if (!partidosFinalData || partidosFinalData.length === 0) {
+      await cargarPartidosFinal();
+    }
+
+    if (Object.keys(partidosGruposData).length === 0) {
+      showToast('Aviso', 'No hay partidos de grupos para exportar', 'warning');
+      return;
+    }
+    if (partidosFinalData.length === 0) {
+      showToast('Aviso', 'No hay partidos de fase final para exportar', 'warning');
+      return;
+    }
+
+    const esc = escaparHtmlExcel;
+    const fechaArchivo = new Date().toISOString().split('T')[0];
+    const fechaHora = new Date().toLocaleString('es-EC', { hour12: false });
+    const nombreArchivo = `Resultados_Partidos_Mundial_2026_${fechaArchivo}.xls`;
+
+    let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; }
+          table { border-collapse: collapse; width: 100%; margin-bottom: 25px; }
+          th, td { border: 1px solid #333; padding: 6px; text-align: left; }
+          th { background-color: #d4af37; color: #000; font-weight: bold; }
+          .jugado { background-color: #c6efce; }
+          .pendiente { background-color: #ffc7ce; }
+          h2 { color: #1f4e79; }
+          h3 { color: #1f4e79; margin-top: 25px; }
+          .fecha { color: #555; font-size: 0.9rem; margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <h2>Resultados Ingresados - Polla Mundialista 2026</h2>
+        <div class="fecha">Fecha de exportación: ${esc(fechaHora)}</div>
+    `;
+
+    // === FASE DE GRUPOS ===
+    html += `<h3>Fase de Grupos</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Grupo</th>
+            <th>Equipo 1</th>
+            <th>Equipo 2</th>
+            <th>Goles Eq1</th>
+            <th>Goles Eq2</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    const gruposOrden = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+    const partidosGruposArray = Object.entries(partidosGruposData).map(([id, data]) => ({ id, ...data }));
+    const gruposMap = {};
+    for (const p of partidosGruposArray) {
+      if (!gruposMap[p.grupo]) gruposMap[p.grupo] = [];
+      gruposMap[p.grupo].push(p);
+    }
+
+    for (const grupo of gruposOrden) {
+      if (!gruposMap[grupo]) continue;
+      const sorted = gruposMap[grupo].sort((a, b) => (a.numero || 0) - (b.numero || 0));
+      for (const p of sorted) {
+        const jugado = p.jugado ? 'Jugado' : 'Pendiente';
+        const rowClass = p.jugado ? 'jugado' : 'pendiente';
+        html += `<tr class="${rowClass}">
+          <td>${esc(p.id)}</td>
+          <td>${esc(p.grupo)}</td>
+          <td>${esc(p.equipo1)}</td>
+          <td>${esc(p.equipo2)}</td>
+          <td>${esc(p.goles_equipo1 ?? '')}</td>
+          <td>${esc(p.goles_equipo2 ?? '')}</td>
+          <td>${esc(jugado)}</td>
+        </tr>`;
+      }
+    }
+    html += `</tbody></table>`;
+
+    // === FASE FINAL ===
+    html += `<h3>Fase Final</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Ronda</th>
+            <th>Equipo 1</th>
+            <th>Equipo 2</th>
+            <th>Goles Eq1</th>
+            <th>Goles Eq2</th>
+            <th>Penales Eq1</th>
+            <th>Penales Eq2</th>
+            <th>Ganador</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    for (const ronda of RONDAS) {
+      const partidos = (partidosFinalPorRonda[ronda] || []).sort((a, b) => (a.numero || 0) - (b.numero || 0));
+      for (const p of partidos) {
+        const res = resultadosFinal[p.id] || {};
+        const g1 = res.g1 ?? '';
+        const g2 = res.g2 ?? '';
+        const p1 = res.p1 ?? '';
+        const p2 = res.p2 ?? '';
+        const eq1 = calcularEquipoDinamico(p.id, true);
+        const eq2 = calcularEquipoDinamico(p.id, false);
+        const ganador = calcularGanadorExport(g1, g2, p1, p2, eq1, eq2);
+        const jugado = res.jugado ? 'Jugado' : 'Pendiente';
+        const rowClass = res.jugado ? 'jugado' : 'pendiente';
+        html += `<tr class="${rowClass}">
+          <td>${esc(p.id)}</td>
+          <td>${esc(NOMBRES_RONDAS[ronda])}</td>
+          <td>${esc(eq1)}</td>
+          <td>${esc(eq2)}</td>
+          <td>${esc(g1)}</td>
+          <td>${esc(g2)}</td>
+          <td>${esc(p1)}</td>
+          <td>${esc(p2)}</td>
+          <td>${esc(ganador)}</td>
+          <td>${esc(jugado)}</td>
+        </tr>`;
+      }
+    }
+    html += `</tbody></table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('Éxito', 'Tabla de resultados exportada a Excel', 'success');
+  } catch (err) {
+    console.error('Error exportando resultados a Excel:', err);
+    showToast('Error', 'No se pudo exportar: ' + err.message, 'error');
+  }
+}
+
 function renderizarRondaActual() {
   const ronda = RONDAS[rondaActualIndex];
   const container = document.getElementById('round-container');
@@ -1524,6 +1700,14 @@ document.getElementById('btn-generar-fase-final').addEventListener('click', asyn
   } finally {
     btn.disabled = false;
   }
+});
+
+// ===== EXPORTAR RESULTADOS A EXCEL =====
+document.getElementById('btn-export-resultados-excel').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export-resultados-excel');
+  btn.disabled = true;
+  await exportarResultadosExcel();
+  btn.disabled = false;
 });
 
 // ===== EXPORTAR TODO A PDF (ZIP) =====
