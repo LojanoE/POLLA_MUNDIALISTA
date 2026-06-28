@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.5';
+import { db } from './firebase-config.js?v=7.8';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.5';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.5';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.8';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.8';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -1711,6 +1711,103 @@ document.getElementById('btn-export-resultados-excel').addEventListener('click',
 });
 
 // ===== EXPORTAR TODO A PDF (ZIP) =====
+// Helper (solo para export PDF): calcula los equipos que cada participante
+// predijo para cada partido de la fase final, recorriendo su propio bracket.
+// Réplica de la lógica de final.js (recalcularTodosEquipos + calcularEquipoDinamico),
+// pero lee directamente de los docs de predicciones_final del usuario. No toca
+// la BD ni los datos reales del admin; solo se usa para mostrar en el PDF, en
+// vez de los placeholders "Ganador F1" / "Perdedor F29" que vienen en
+// partidos_final.equipo1/equipo2 para F17+.
+const RONDAS_EXPORT_PDF = ['dieciseisavos', 'octavos', 'cuartos', 'semis', 'tercer_lugar', 'final'];
+
+function calcularEquiposPredichosUsuario(prediccionesArr, partidosFinalArr) {
+  const preds = {};
+  for (const p of (prediccionesArr || [])) preds[p.partido_id] = p;
+
+  const partidosById = {};
+  for (const p of partidosFinalArr) partidosById[p.id] = p;
+
+  const porRonda = {};
+  for (const r of RONDAS_EXPORT_PDF) porRonda[r] = [];
+  for (const p of partidosFinalArr) if (porRonda[p.ronda]) porRonda[p.ronda].push(p);
+  for (const r of RONDAS_EXPORT_PDF) porRonda[r].sort((a, b) => a.numero - b.numero);
+
+  const cache = {};
+
+  function extraerSource(nombre) {
+    if (!nombre) return null;
+    const m = nombre.match(/(F\d+)/);
+    return m ? m[1] : null;
+  }
+
+  function calcDinamico(partidoId, esEq1, visited = new Set()) {
+    if (cache[partidoId]) return esEq1 ? cache[partidoId].eq1 : cache[partidoId].eq2;
+
+    const partido = partidosById[partidoId];
+    if (!partido) return 'Por definir';
+
+    // Dieciseisavos: equipos reales de la BD (partidos_final.equipo1/2).
+    if (partido.ronda === 'dieciseisavos') {
+      const eq1 = partido.equipo1 || '?';
+      const eq2 = partido.equipo2 || '?';
+      cache[partidoId] = { eq1, eq2 };
+      return esEq1 ? eq1 : eq2;
+    }
+
+    // Protección contra ciclos
+    const key = partidoId + (esEq1 ? '_1' : '_2');
+    if (visited.has(key)) return 'Por definir';
+    visited.add(key);
+
+    let sourceId = esEq1 ? partido.source_equipo1 : partido.source_equipo2;
+    if (!sourceId) sourceId = extraerSource(esEq1 ? partido.equipo1 : partido.equipo2);
+    if (!sourceId) return 'Por definir';
+
+    let esPerdedor = esEq1 ? partido.perdedor_source1 : partido.perdedor_source2;
+    if (partido.ronda === 'tercer_lugar' && !esPerdedor) esPerdedor = true;
+
+    const pred = preds[sourceId];
+    if (!pred || pred.prediccion_equipo1 === null || pred.prediccion_equipo1 === undefined ||
+        pred.prediccion_equipo2 === null || pred.prediccion_equipo2 === undefined) {
+      return esPerdedor ? `Perdedor ${sourceId}` : `Ganador ${sourceId}`;
+    }
+
+    const g1 = parseInt(pred.prediccion_equipo1);
+    const g2 = parseInt(pred.prediccion_equipo2);
+    if (isNaN(g1) || isNaN(g2)) {
+      return esPerdedor ? `Perdedor ${sourceId}` : `Ganador ${sourceId}`;
+    }
+
+    const p1Raw = pred.prediccion_penales_equipo1;
+    const p2Raw = pred.prediccion_penales_equipo2;
+    const p1 = (p1Raw !== null && p1Raw !== undefined && p1Raw !== '') ? parseInt(p1Raw) : null;
+    const p2 = (p2Raw !== null && p2Raw !== undefined && p2Raw !== '') ? parseInt(p2Raw) : null;
+
+    const eq1Src = cache[sourceId]?.eq1 || calcDinamico(sourceId, true, visited);
+    const eq2Src = cache[sourceId]?.eq2 || calcDinamico(sourceId, false, visited);
+
+    let ganadorEq = null;
+    if (g1 > g2) ganadorEq = eq1Src;
+    else if (g2 > g1) ganadorEq = eq2Src;
+    else if (p1 !== null && p2 !== null && !isNaN(p1) && !isNaN(p2) && p1 !== p2) {
+      ganadorEq = p1 > p2 ? eq1Src : eq2Src;
+    }
+
+    if (!ganadorEq) return esPerdedor ? `Perdedor ${sourceId}` : `Ganador ${sourceId}`;
+
+    return esPerdedor ? (ganadorEq === eq1Src ? eq2Src : eq1Src) : ganadorEq;
+  }
+
+  for (const r of RONDAS_EXPORT_PDF) {
+    for (const p of porRonda[r]) {
+      const eq1 = calcDinamico(p.id, true);
+      const eq2 = calcDinamico(p.id, false);
+      cache[p.id] = { eq1, eq2 };
+    }
+  }
+  return cache;
+}
+
 document.getElementById('btn-export-all-pdf').addEventListener('click', async () => {
   const btn = document.getElementById('btn-export-all-pdf');
   const status = document.getElementById('export-status');
@@ -1764,7 +1861,7 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
     
     const partidosFinalMap = {};
     partidosFinalSnap.forEach(d => {
-      partidosFinalMap[d.id] = d.data();
+      partidosFinalMap[d.id] = { id: d.id, ...d.data() };
     });
     
     status.textContent = '📄 Generando PDFs... (0/' + usuarios.length + ')';
@@ -1848,6 +1945,10 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
       y += 10;
       
       const predsF = allPredsFinal[u.id] || [];
+      // Calcular los equipos que este participante predijo para cada partido
+      // (no los placeholders "Ganador F1", sino los nombres reales derivados
+      //  de su propio bracket). No afecta datos reales ni scoring del admin.
+      const equiposCalcUsuario = calcularEquiposPredichosUsuario(predsF, Object.values(partidosFinalMap));
       if (predsF.length === 0) {
         docPdf.setFont(undefined, 'italic');
         docPdf.text('No hay predicciones registradas para esta fase.', 25, y);
@@ -1857,20 +1958,31 @@ document.getElementById('btn-export-all-pdf').addEventListener('click', async ()
         docPdf.setFont(undefined, 'bold');
         docPdf.text('RONDA / PARTIDO', 25, y);
         docPdf.text('MARCADOR', 100, y);
-        docPdf.text('GANADOR', 140, y);
+        docPdf.text('PENALES', 125, y);
+        docPdf.text('GANADOR', 155, y);
         y += 5;
-        docPdf.line(25, y, 180, y);
+        docPdf.line(25, y, 185, y);
         y += 7;
         
         docPdf.setFont(undefined, 'normal');
         predsF.sort((a,b) => a.partido_id.localeCompare(b.partido_id)).forEach(p => {
           if (y > 270) { docPdf.addPage(); y = 20; }
-          const partidoReal = partidosFinalMap[p.partido_id];
-          const eq1 = partidoReal ? partidoReal.equipo1 : '?';
-          const eq2 = partidoReal ? partidoReal.equipo2 : '?';
+          const ec = equiposCalcUsuario[p.partido_id] || {};
+          const eq1 = ec.eq1 || (partidosFinalMap[p.partido_id] ? partidosFinalMap[p.partido_id].equipo1 : '?');
+          const eq2 = ec.eq2 || (partidosFinalMap[p.partido_id] ? partidosFinalMap[p.partido_id].equipo2 : '?');
+          // Marcador a 90 min
+          const g1Pdf = (p.prediccion_equipo1 !== null && p.prediccion_equipo1 !== undefined) ? p.prediccion_equipo1 : '-';
+          const g2Pdf = (p.prediccion_equipo2 !== null && p.prediccion_equipo2 !== undefined) ? p.prediccion_equipo2 : '-';
+          // Penales (solo si los ingresó, si no '-')
+          const pen1Raw = p.prediccion_penales_equipo1;
+          const pen2Raw = p.prediccion_penales_equipo2;
+          const pen1 = (pen1Raw !== null && pen1Raw !== undefined && pen1Raw !== '') ? pen1Raw : null;
+          const pen2 = (pen2Raw !== null && pen2Raw !== undefined && pen2Raw !== '') ? pen2Raw : null;
+          const penalesTxt = (pen1 !== null && pen2 !== null) ? `${pen1} - ${pen2}` : '-';
           docPdf.text(`${p.partido_id}: ${eq1} vs ${eq2}`, 25, y);
-          docPdf.text(`${p.prediccion_equipo1} - ${p.prediccion_equipo2}`, 100, y);
-          docPdf.text(p.prediccion_ganador || '-', 140, y);
+          docPdf.text(`${g1Pdf} - ${g2Pdf}`, 100, y);
+          docPdf.text(penalesTxt, 125, y);
+          docPdf.text(p.prediccion_ganador || '-', 155, y);
           y += 6;
         });
       }
