@@ -45,6 +45,10 @@ let partidosPorRonda = {};
 let isSaving = false;
 let prediccionesFinalAbiertas = true;
 let mapaDependencias = {};       // { sourceId: [partidoId que depende de sourceId, ...] }
+// Override por usuario: si el admin activa `permite_editar_final` en el doc
+// del usuario, este ignora los candados de fase_final_habilitada,
+// predicciones_final_abiertas y jugado por partido (recovery por error de DB).
+let overrideUsuario = false;
 
 // ===== UTILIDADES =====
 function showAlert(msg, type) {
@@ -69,10 +73,25 @@ function esPlaceholder(equipo) {
 // ===== VERIFICAR FASE FINAL HABILITADA =====
 async function checkFaseFinal() {
   try {
+    // Leer flag de override del usuarioactual (recovery de predicciones).
+    try {
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        const userRef = doc(db, 'users', `${currentUser.cedula}_${currentUser.alias}`);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && userSnap.data().permite_editar_final === true) {
+          overrideUsuario = true;
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo leer override de usuario', e);
+    }
+    
     const configRef = doc(db, 'config', 'app_config');
     const configSnap = await getDoc(configRef);
+    const habilitada = configSnap.exists() ? !!configSnap.data().fase_final_habilitada : false;
     
-    if (!configSnap.exists() || !configSnap.data().fase_final_habilitada) {
+    if (!habilitada && !overrideUsuario) {
       document.getElementById('bloqueo-msg').style.display = 'block';
       if (fabBracket) fabBracket.style.display = 'none';
       return false;
@@ -106,7 +125,21 @@ async function cargarPartidosFinal() {
     
     const plazoCerradoMsg = document.getElementById('plazo-cerrado-msg');
     if (plazoCerradoMsg) {
-      plazoCerradoMsg.style.display = prediccionesFinalAbiertas ? 'none' : 'block';
+      const plazoEfectivo = prediccionesFinalAbiertas || overrideUsuario;
+      plazoCerradoMsg.style.display = plazoEfectivo ? 'none' : 'block';
+    }
+    
+    // Banner informativo cuando el usuario tiene override activo
+    let overrideBanner = document.getElementById('override-banner');
+    if (overrideUsuario && !overrideBanner) {
+      overrideBanner = document.createElement('div');
+      overrideBanner.id = 'override-banner';
+      overrideBanner.style.cssText = 'padding:10px 16px; margin:10px 0; border-radius:8px; background:rgba(243,156,18,0.15); border:1px solid #f39c12; color:#f39c12; font-size:0.9rem; text-align:center;';
+      overrideBanner.innerHTML = '🔓 <strong>Modo edición especial activo</strong> — Puedes ingresar y editar predicciones de la Fase Final, incluidos partidos ya jugados. Este permiso lo activa el administrador.';
+      const content = document.getElementById('final-content');
+      if (content) content.insertBefore(overrideBanner, content.firstChild);
+    } else if (!overrideUsuario && overrideBanner) {
+      overrideBanner.remove();
     }
     
     const q = query(collection(db, 'partidos_final'));
@@ -341,25 +374,30 @@ function renderizarRondaActual() {
     const eq2 = equiposCalculados[p.id]?.eq2 || p.equipo2;
     const yaGuardado = prediccionesGuardadasIds.has(p.id);
     const jugado = p.jugado;
-    // Bloquear si el partido YA SE JUGÓ o si el plazo de predicciones cerró
-    const disabled = (jugado || !prediccionesFinalAbiertas) ? 'disabled' : '';
+    // Con override de usuario, ignorar el bloqueo por jugado y por plazo cerrado.
+    const plazoEfectivo = prediccionesFinalAbiertas || overrideUsuario;
+    const jugadoBloquea = jugado && !overrideUsuario;
+    const disabled = (jugadoBloquea || !plazoEfectivo) ? 'disabled' : '';
     const pred = prediccionesLocales[p.id] || {};
     const g1 = pred.g1 ?? '';
     const g2 = pred.g2 ?? '';
     const p1 = pred.p1 ?? '';
     const p2 = pred.p2 ?? '';
     
-    // Determinar si se muestran penales
+    // Determinar si se muestran penales (también en jugados si override activo)
     const g1Num = g1 !== '' ? parseInt(g1) : null;
     const g2Num = g2 !== '' ? parseInt(g2) : null;
-    const mostrarPenales = g1Num !== null && g2Num !== null && g1Num === g2Num && !jugado;
+    const mostrarPenales = g1Num !== null && g2Num !== null && g1Num === g2Num && (!jugado || overrideUsuario);
     const penalesClass = mostrarPenales ? 'visible' : '';
     
     // Determinar estado del ganador
     let winnerHtml = '';
-    if (jugado) {
+    if (jugado && !overrideUsuario) {
       const ganador = pred.ganador || calcularGanadorAutomatico(p.id);
       winnerHtml = `<span class="winner-name">✅ Partido jugado - Avanza: ${ganador || '?'}</span>`;
+    } else if (jugado && overrideUsuario) {
+      const ganador = calcularGanadorAutomatico(p.id);
+      winnerHtml = `<span class="winner-name" style="color:#f39c12;">🔓 Partido jugado (editable) - Avanza: ${ganador || '?'}</span>`;
     } else if (yaGuardado) {
       const ganador = pred.ganador || calcularGanadorAutomatico(p.id);
       winnerHtml = `<span class="winner-name">✓ Guardado - Avanza: ${ganador || '?'}</span>`;
@@ -633,9 +671,9 @@ function actualizarBotonesGuardado() {
   const todoCompleto = completados === total;
   const todoGuardado = guardados === total;
   
-  if (!prediccionesFinalAbiertas) {
+if (!prediccionesFinalAbiertas && !overrideUsuario) {
     btnFinal.disabled = true;
-    btnFinal.textContent = '🔒 Predicciones cerradas';
+    btnFinal.textContent = '⏹ Predicciones cerradas';
     btnProgress.style.display = 'none';
     status.textContent = 'El plazo para ingresar predicciones ha cerrado.';
   } else if (todoGuardado) {
@@ -746,7 +784,7 @@ async function guardarPredicciones(bloquear = false) {
   const user = getCurrentUser();
   const institucion = getInstitucionActiva();
   
-  if (!prediccionesFinalAbiertas) {
+  if (!prediccionesFinalAbiertas && !overrideUsuario) {
     showAlert('El plazo para ingresar predicciones ha cerrado', 'warning');
     isSaving = false;
     actualizarBotonesGuardado();

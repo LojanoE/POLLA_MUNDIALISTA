@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.10';
+import { db } from './firebase-config.js?v=7.11';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.10';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.10';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.11';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.11';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -166,6 +166,30 @@ window.toggleInstitucion = async (id, activar) => {
   } catch (err) {
     console.error(err);
     showToast('Error', 'No se pudo actualizar la institución', 'error');
+  }
+};
+
+// Activar/desactivar permiso especial de edición de Fase Final para un usuario.
+// Cuando está activo, el usuario puede ingresar y editar predicciones de Fase
+// Final incluso si la fase está deshabilitada, el plazo cerrado o el partido ya
+// jugado. Uso pensado para recuperaciónpor errores de DB del participante.
+window.togglePermiteEditarFinal = async (cedula, alias, activar) => {
+  if (!confirm(
+    `${activar ? '🔑 Activar' : '🔒 Quitar'} permiso de edición de Fase Final\n\n` +
+    `Usuario: ${alias} (${cedula})\n\n` +
+    (activar
+      ? 'Este usuario podrá ingresar y editar predicciones de Fase Final, incluyendo partidos ya jugados y aunque el plazo esté cerrado. Recuerda recalcular puntos después desde el panel de admin.'
+      : 'Se retirará el permiso especial. El usuario volverá a estar sujeto a los candados generales.') +
+    '\n\n¿Deseas continuar?'
+  )) return;
+  try {
+    await setDoc(doc(db, 'users', `${cedula}_${alias}`), { permite_editar_final: activar }, { merge: true });
+    showToast('Éxito', `Permiso de edición de Fase Final ${activar ? 'activado' : 'desactivado'} para ${alias}`, 'success');
+    // Refrescar la tabla de resultados de búsqueda para reflejar el nuevo estado
+    document.getElementById('btn-search-user').click();
+  } catch (err) {
+    console.error(err);
+    showToast('Error', 'No se pudo actualizar el permiso del usuario', 'error');
   }
 };
 
@@ -2255,6 +2279,7 @@ document.getElementById('btn-search-user').addEventListener('click', async () =>
             <th>Pts Grupos</th>
             <th>Pts Final</th>
             <th>Pts Total</th>
+            <th>Override FF</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -2266,6 +2291,12 @@ document.getElementById('btn-search-user').addEventListener('click', async () =>
       const { cedula: uCed, alias: uAl } = resolverIdUsuario(u.id, u);
       const cedSafe = String(uCed).replace(/'/g, "\\'");
       const alSafe = String(uAl).replace(/'/g, "\\'");
+      const overrideFF = u.permite_editar_final === true;
+      const overrideBadge = overrideFF
+        ? '<span style="color:#f39c12;" title="El usuario puede editar Fase Final aunque esté cerrada o jugada">🔓 Sí</span>'
+        : '<span style="color:var(--text-muted);" title="Sin permiso especial">—</span>';
+      const overrideBtnLabel = overrideFF ? 'Quitar permiso' : 'Permitir editar FF';
+      const overrideBtnClass = overrideFF ? 'btn btn-warning' : 'btn btn-success';
       html += `
         <tr>
           <td>${uCed}</td>
@@ -2273,9 +2304,12 @@ document.getElementById('btn-search-user').addEventListener('click', async () =>
           <td>${u.puntos_fase_grupos || 0}</td>
           <td>${u.puntos_fase_final || 0}</td>
           <td style="font-weight:bold; color:var(--accent);">${u.puntos_total || 0}</td>
+          <td style="text-align:center;">${overrideBadge}</td>
           <td>
             <button class="btn btn-info" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 5px;" 
               onclick="window.verPrediccionesUsuario('${cedSafe}', '${alSafe}')">📋 Ver</button>
+            <button class="${overrideBtnClass}" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 5px;" 
+              onclick="window.togglePermiteEditarFinal('${cedSafe}', '${alSafe}', ${!overrideFF})">${overrideBtnLabel}</button>
             <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;" 
               onclick="window.eliminarUsuario('${cedSafe}', '${alSafe}')">🗑️ Eliminar</button>
           </td>
