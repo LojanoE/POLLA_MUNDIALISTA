@@ -1,9 +1,9 @@
 /* admin.js - Panel de Administración con Sistema de Pasos y Manejo de Errores Premium */
 
-import { db } from './firebase-config.js?v=7.11';
+import { db } from './firebase-config.js?v=7.12';
 import { collection, query, getDocs, doc, getDoc, setDoc, writeBatch, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.11';
-import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.11';
+import { requireAdmin, updateNav, logout, getCurrentUser } from './auth.js?v=7.12';
+import { BANDERAS, GRUPOS, generarPartidosGrupos, generarPartidosFinal, calcularTablaGrupo, seleccionarMejoresTerceros, placeholderToEquipo } from './data.js?v=7.12';
 
 const user = requireAdmin();
 if (!user) throw new Error("No autorizado");
@@ -511,7 +511,12 @@ async function recalcularTodosLosPuntos() {
     // 5. Calcular puntos de fase final
     const partidosFinalSnap = await getDocs(collection(db, 'partidos_final'));
     const allPartidosFinal = {};
-    partidosFinalSnap.forEach(d => allPartidosFinal[d.id] = d.data());
+    const allPartidosFinalArr = [];
+    partidosFinalSnap.forEach(d => {
+      const data = { id: d.id, ...d.data() };
+      allPartidosFinal[d.id] = data;
+      allPartidosFinalArr.push(data);
+    });
     
     const partidosFinalJugados = {};
     for (const [id, p] of Object.entries(allPartidosFinal)) {
@@ -604,31 +609,50 @@ async function recalcularTodosLosPuntos() {
     for (const u of usuarios) {
       let ptsFinal = 0;
       const preds = predsFinal[u.id] || {};
-      
+
+      // Resolver los equipos que el usuario PREDIJO para cada partido F1-F32
+      // a partir de sus propias predicciones (bracket propagado del usuario).
+      // Se usa para gatear los puntos por marcador en F17+: si el matchup real
+      // no coincide con el que el usuario pronosticó, no se otorgan los puntos
+      // por marcador exacto ni por acierto de ganador/empate. Solo sobrevive
+      // el 1 pt por acertar el clasificado (nombre). En F1-F16 (dieciseisavos)
+      // los equipos siempre coinciden, así que el scoring es el normal.
+      const eqPred = calcularEquiposPredichosUsuario(Object.values(preds), allPartidosFinalArr);
+
       for (const [partidoId, partido] of Object.entries(partidosFinalJugados)) {
         const pred = preds[partidoId];
         if (!pred) continue;
-        
+
         const g1 = partido.goles_equipo1;
         const g2 = partido.goles_equipo2;
         const p1 = pred.prediccion_equipo1;
         const p2 = pred.prediccion_equipo2;
-        
+
+        // Emparejamiento real vs predicho (posicional eq1/eq2)
+        const eq1Real = resolverEquipoReal(partido, true);
+        const eq2Real = resolverEquipoReal(partido, false);
+        const eq1P = eqPred[partidoId] ? eqPred[partidoId].eq1 : null;
+        const eq2P = eqPred[partidoId] ? eqPred[partidoId].eq2 : null;
+        const matchupMatch = (eq1Real && eq2P && eq1Real === eq1P && eq2Real === eq2P);
+
         let ptsPartido = 0;
-        
-        if (p1 === g1 && p2 === g2) ptsPartido += 3;
-        else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) ptsPartido += 1;
-        
+
+        // Puntos por marcador solo si el matchup coincide
+        if (matchupMatch) {
+          if (p1 === g1 && p2 === g2) ptsPartido += 3;
+          else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) ptsPartido += 1;
+        }
+
         const realGanador = getGanadorReal(partido);
         const predGanador = pred.prediccion_ganador;
         if (realGanador && predGanador && realGanador === predGanador) ptsPartido += 1;
-        
+
         // Cap máximo de 4 puntos por partido
         if (ptsPartido > 4) ptsPartido = 4;
-        
+
         ptsFinal += ptsPartido;
       }
-      
+
       puntosPorUsuario[u.id].puntosFinal = ptsFinal;
     }
     

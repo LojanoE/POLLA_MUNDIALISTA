@@ -1,8 +1,8 @@
 /* ranking.js - Tablas de posiciones en tiempo real + Probabilidad Monte Carlo Fase Final */
 
-import { db } from './firebase-config.js?v=7.9';
+import { db } from './firebase-config.js?v=7.10';
 import { collection, query, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.9';
+import { requireAuth, updateNav, logout, getCurrentUser, getInstitucionActiva } from './auth.js?v=7.10';
 
 const user = requireAuth();
 if (!user) throw new Error("No autenticado");
@@ -235,6 +235,93 @@ function filtrarUsuarios(todos) {
 
 // ===== HELPERS DE MC (réplica de admin.js:491-552) =====
 
+// Resolver los equipos que un usuario PREDIJO para cada partido F1-F32,
+// a partir de sus propias predicciones (bracket propagado). Réplica read-only
+// de admin.js:calcularEquiposPredichosUsuario. Devuelve { [partidoId]: { eq1, eq2 } }.
+const RONDAS_RESOLVER = ['dieciseisavos', 'octavos', 'cuartos', 'semis', 'tercer_lugar', 'final'];
+function resolverEquiposPredichosUser(prediccionesArr, partidosArr) {
+  const preds = {};
+  for (const p of (prediccionesArr || [])) preds[p.partido_id] = p;
+
+  const partidosById = {};
+  for (const p of partidosArr) partidosById[p.id] = p;
+
+  const porRonda = {};
+  for (const r of RONDAS_RESOLVER) porRonda[r] = [];
+  for (const p of partidosArr) if (porRonda[p.ronda]) porRonda[p.ronda].push(p);
+  for (const r of RONDAS_RESOLVER) porRonda[r].sort((a, b) => (a.numero || 0) - (b.numero || 0));
+
+  const cache = {};
+
+  function extraerSource(nombre) {
+    if (!nombre) return null;
+    const m = nombre.match(/(F\d+)/);
+    return m ? m[1] : null;
+  }
+
+  function calcDinamico(partidoId, esEq1, visited = new Set()) {
+    if (cache[partidoId]) return esEq1 ? cache[partidoId].eq1 : cache[partidoId].eq2;
+
+    const partido = partidosById[partidoId];
+    if (!partido) return null;
+
+    if (partido.ronda === 'dieciseisavos') {
+      const eq1 = partido.equipo1 || null;
+      const eq2 = partido.equipo2 || null;
+      cache[partidoId] = { eq1, eq2 };
+      return esEq1 ? eq1 : eq2;
+    }
+
+    const key = partidoId + (esEq1 ? '_1' : '_2');
+    if (visited.has(key)) return null;
+    visited.add(key);
+
+    let sourceId = esEq1 ? partido.source_equipo1 : partido.source_equipo2;
+    if (!sourceId) sourceId = extraerSource(esEq1 ? partido.equipo1 : partido.equipo2);
+    if (!sourceId) return null;
+
+    let esPerdedor = esEq1 ? partido.perdedor_source1 : partido.perdedor_source2;
+    if (partido.ronda === 'tercer_lugar' && !esPerdedor) esPerdedor = true;
+
+    const pred = preds[sourceId];
+    if (!pred || pred.prediccion_equipo1 === null || pred.prediccion_equipo1 === undefined ||
+        pred.prediccion_equipo2 === null || pred.prediccion_equipo2 === undefined) {
+      return null;
+    }
+
+    const g1 = parseInt(pred.prediccion_equipo1);
+    const g2 = parseInt(pred.prediccion_equipo2);
+    if (isNaN(g1) || isNaN(g2)) return null;
+
+    const p1Raw = pred.prediccion_penales_equipo1;
+    const p2Raw = pred.prediccion_penales_equipo2;
+    const p1 = (p1Raw !== null && p1Raw !== undefined && p1Raw !== '') ? parseInt(p1Raw) : null;
+    const p2 = (p2Raw !== null && p2Raw !== undefined && p2Raw !== '') ? parseInt(p2Raw) : null;
+
+    const eq1Src = cache[sourceId]?.eq1 || calcDinamico(sourceId, true, visited);
+    const eq2Src = cache[sourceId]?.eq2 || calcDinamico(sourceId, false, visited);
+
+    let ganadorEq = null;
+    if (g1 > g2) ganadorEq = eq1Src;
+    else if (g2 > g1) ganadorEq = eq2Src;
+    else if (p1 !== null && p2 !== null && !isNaN(p1) && !isNaN(p2) && p1 !== p2) {
+      ganadorEq = p1 > p2 ? eq1Src : eq2Src;
+    }
+
+    if (!ganadorEq) return null;
+    return esPerdedor ? (ganadorEq === eq1Src ? eq2Src : eq1Src) : ganadorEq;
+  }
+
+  for (const r of RONDAS_RESOLVER) {
+    for (const p of porRonda[r]) {
+      const eq1 = calcDinamico(p.id, true);
+      const eq2 = calcDinamico(p.id, false);
+      cache[p.id] = { eq1, eq2 };
+    }
+  }
+  return cache;
+}
+
 // Resolver nombre real de equipo recursivamente (sobre un estado sampled de partidos_final)
 function resolverEquipoRealMC(partidoId, esEquipo1, estadoPartidos, visited = new Set()) {
   const key = `${partidoId}_${esEquipo1}`;
@@ -301,8 +388,12 @@ function getGanadorRealMC(partidoId, estadoPartidos) {
   return null;
 }
 
-// Scoring por partido (réplica admin.js:574-584)
-function scorePartidoFinalMC(partidoId, pred, estadoPartidos) {
+// Scoring por partido (réplica admin.js). `eqPredUser` = { [partidoId]: { eq1, eq2 } }
+// con los equipos que el usuario PREDIJO para cada partido. Los puntos por
+// marcador (3 exacto / 1 dirección) solo se otorgan si el matchup real resuelto
+// del estado sampled coincide con el matchup predicho por el usuario (F17+).
+// El 1 pt por clasificado (nombre) se otorga siempre.
+function scorePartidoFinalMC(partidoId, pred, estadoPartidos, eqPredUser) {
   if (!pred) return 0;
   const partido = estadoPartidos[partidoId];
   if (!partido) return 0;
@@ -315,9 +406,18 @@ function scorePartidoFinalMC(partidoId, pred, estadoPartidos) {
   const p2 = pred.prediccion_equipo2;
   if (p1 === null || p1 === undefined || p2 === null || p2 === undefined) return 0;
 
+  // Emparejamiento real vs predicho (posicional eq1/eq2)
+  const eq1Real = resolverEquipoRealMC(partidoId, true, estadoPartidos);
+  const eq2Real = resolverEquipoRealMC(partidoId, false, estadoPartidos);
+  const eq1P = eqPredUser && eqPredUser[partidoId] ? eqPredUser[partidoId].eq1 : null;
+  const eq2P = eqPredUser && eqPredUser[partidoId] ? eqPredUser[partidoId].eq2 : null;
+  const matchupMatch = (eq1Real && eq1P && eq2Real && eq2P && eq1Real === eq1P && eq2Real === eq2P);
+
   let pts = 0;
-  if (p1 === g1 && p2 === g2) pts += 3;
-  else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) pts += 1;
+  if (matchupMatch) {
+    if (p1 === g1 && p2 === g2) pts += 3;
+    else if ((g1 > g2 && p1 > p2) || (g2 > g1 && p2 > p1) || (g1 === g2 && p1 === p2)) pts += 1;
+  }
 
   const realGanador = getGanadorRealMC(partidoId, estadoPartidos);
   const predGanador = pred.prediccion_ganador;
@@ -405,8 +505,14 @@ async function calcularProbabilidadesMC() {
 
   // Pre-fetch predicciones por user_id
   const predsPorUser = {};
+  // Equipos predichos por usuario (bracket propio) — precomputado UNA vez
+  // fuera del loop de 1000 iter para no recalcular en cada iteración.
+  const eqPredPorUser = {};
+  const partidosArrParaResolver = Object.values(partidosFinalDict);
   for (const u of usuariosVisibles) {
-    predsPorUser[u.id] = prediccionesPorUser[u.id] || {};
+    const preds = prediccionesPorUser[u.id] || {};
+    predsPorUser[u.id] = preds;
+    eqPredPorUser[u.id] = resolverEquiposPredichosUser(Object.values(preds), partidosArrParaResolver);
   }
 
   // Contador de victorias
@@ -446,7 +552,7 @@ async function calcularProbabilidadesMC() {
           for (const pid of noJugados) {
             const pred = preds[pid];
             if (!pred) continue;
-            pts += scorePartidoFinalMC(pid, pred, estado);
+            pts += scorePartidoFinalMC(pid, pred, estado, eqPredPorUser[u.id]);
           }
           if (pts > maxPts) {
             maxPts = pts;
