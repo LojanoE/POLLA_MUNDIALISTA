@@ -85,8 +85,10 @@ Implemented in `admin.js:recalcularTodosLosPuntos()` and documented in `reglas.h
 - **Cap 4 pts por partido.**
 - Penales solo desempatan al clasificado; no suman.
 - **Gateo por matchup (v7.12), solo F17+ (octavos → final + tercer lugar):** los dos primeros puntos (marcador exacto y acierto ganador/empate) **solo se otorgan si los equipos que realmente jugaron el partido coinciden con los que el usuario predijo** (resueltos via `calcularEquiposPredichosUsuario`, comparación posicional eq1/eq2). Si el matchup real ≠ matchup predicho, esos dos puntos se anulan y solo sobrevive el 1 pt por acertar el clasificado (nombre). F1–F16 (dieciseisavos) siempre tienen matchup coincidente (equipos reales del grupo), así que ahí aplica el scoring normal. El Monte Carlo de `ranking.js` (`scorePartidoFinalMC`) replica este gateo exactamente.
+- **La regla es latente:** solo se evalúa sobre `partidos_final` con `jugado === true`. Mientras ningún F17+ esté jugado (p.ej. toda la fase de dieciseisavos), `recalcularTodosLosPuntos()` produce los mismos `puntos_fase_final` que antes. El gateo empieza a tener efecto cuando el admin marque jugados los primeros octavos y el recálculo se dispare.
+- **v7.12:** `reglas.html`/`js/reglas.js` **NO** se actualizaron — el usuario prefirió comunicar la regla nueva por WhatsApp en vez de tocar la leyenda pública. La regla vive solo en el código (`admin.js`, `ranking.js`) y en este archivo. No "corrijas" la leyenda pública sin pedirlo.
 
-If you change scoring, update `reglas.html`, `admin.js`, and this file together — and bump the cache version.
+If you change scoring, update `admin.js` (y `ranking.js` para mantener MC sincronizado) y este archivo — y bump el cache. `reglas.html` es la leyenda pública; edítala solo si el usuario lo pide (en v7.12 no se tocó).
 
 ## 8. Conventions
 
@@ -143,4 +145,4 @@ When making JS changes to a page, bump that page's `?v=` (and any inline imports
 
 ---
 
-Última actualización: 2026-07-01 (§3 v7.7/v7.11 bumps + `permite_editar_final`; §4 admin.js line refs; §5 users `permite_editar_final`; §7 scoring line refs + gateo por matchup F17+ v7.12; fix refs everywhere; see §4 GEMINI.md note).
+Última actualización: 2026-07-01 (§3 v7.12 admin + v7.10 ranking; §7 gateo por matchup F17+ v7.12 — regla latente, `reglas.html` NO tocada por decisión del usuario; MC de `ranking.js` replica el gateo). Sección previa §6 v7.7/v7.11 `permite_editar_final` sigue vigente.
